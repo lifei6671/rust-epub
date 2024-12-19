@@ -9,6 +9,13 @@ const IMAGE_FOLDER_NAME:&str = "images";
 const VIDEO_FOLDER_NAME:&str = "videos";
 const AUDIO_FOLDER_NAME:&str= "audios";
 
+
+/// epub规范版本
+pub enum Version {
+    V2,
+    V3,
+}
+
 /// An epub file structure instance
 pub struct Epub {
     /// Book creator
