@@ -1,0 +1,13 @@
+[package]
+name = "rust-epub"
+version = "0.1.0"
+authors = ["lifei6671 <lifei6671@gmail.com>"]
+description = "一个Rust实现的用于编辑和创建 EPUB 文件的库。"
+edition = "2021"
+
+[dependencies]
+quick-xml = { version = "0.37.1" ,features = ["serde","serialize"]}
+serde = { version = "1.0.216", features = ["derive"] }
+
+[[example]]
+name = "toc"
