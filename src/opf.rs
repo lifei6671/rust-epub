@@ -35,7 +35,7 @@ pub struct Metadata {
     contributor:Option<String>,
     #[serde(rename = "dc:format")]
     format : Option<String>,
-    #[serde(rename = "dc:identifier")]
+    #[serde(rename = "dc:identifier", skip_serializing_if="skip_if_empty_identifier")]
     identifier : Option<Identifier>,
     #[serde(rename = "dc:source")]
     source : Option<String>,
@@ -49,6 +49,8 @@ pub struct Metadata {
     rights : Option<String>,
     #[serde(rename = "dc:cover")]
     cover : Option<String>,
+
+
 }
 
 impl Metadata {
@@ -84,14 +86,25 @@ struct MetaItem {
     name: String,
 }
 
+// 自定义结构体的序列化条件
+fn skip_if_empty_identifier(identifier: &Option<Identifier>) -> bool {
+    if let Some(id) = identifier {
+        id.text.is_empty()
+    } else {
+        true
+    }
+}
+
 /// 出版社信息
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "identifier")]
 pub struct Identifier {
-    #[serde(rename = "@id")]
+    #[serde(rename = "@id", skip_serializing_if = "String::is_empty")]
     id : String,
-    #[serde(rename = "opf:scheme")]
+    #[serde(rename = "opf:scheme",skip_serializing_if = "String::is_empty")]
     scheme :String,
+    #[serde(rename = "$text")]
+    text : String,
 }
 
 
