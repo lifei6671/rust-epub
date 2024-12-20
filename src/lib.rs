@@ -1,6 +1,7 @@
 pub mod epub;
 pub mod toc;
 pub mod opf;
+pub mod mime;
 
 /// 错误信息枚举
 #[derive(Debug)]

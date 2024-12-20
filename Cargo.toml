@@ -8,6 +8,9 @@ edition = "2021"
 [dependencies]
 quick-xml = { version = "0.37.1" ,features = ["serde","serialize"]}
 serde = { version = "1.0.216", features = ["derive"] }
-
+chrono = "0.4.39"
+uuid = { version = "1.11.0", features = ["v4"] }
+lazy_static = "1.5.0"
+mime = "0.3.17"
 [[example]]
 name = "toc"

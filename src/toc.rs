@@ -1,5 +1,4 @@
-use crate::epub::Version;
-use serde::ser::{SerializeSeq, Serializer};
+use crate::epub::EpubVersion;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default)]
@@ -19,6 +18,10 @@ impl TocNav {
             elements: Vec::new(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty() || self.elements.len() <= 1
+    }
     /// 增加元数据
     pub fn add_metadata<S1: Into<String>, S2: Into<String>>(
         &mut self,
@@ -32,10 +35,10 @@ impl TocNav {
         self.elements.push(elem);
         self
     }
-    pub fn encode_file(&mut self, ver: Version) -> Result<String, super::Error> {
+    pub fn encode_file(&mut self, ver: EpubVersion) -> Result<String, super::Error> {
         match ver {
-            Version::V2 => self.encode_ncx_file(),
-            Version::V3 => self.encode_nav_file(),
+            EpubVersion::V20 => self.encode_ncx_file(),
+            EpubVersion::V30 => self.encode_nav_file(),
         }
     }
 
@@ -152,7 +155,7 @@ impl TocElement {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "ncx")]
-pub struct TocNCX {
+struct TocNCX {
     #[serde(rename = "head")]
     head: Metadata,
     #[serde(rename = "docTitle")]
@@ -201,7 +204,7 @@ struct MetaItem {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename = "navMap")]
-pub struct NavMap {
+struct NavMap {
     nav_point: Vec<NavPoint>,
 }
 
@@ -215,7 +218,7 @@ impl NavMap {
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename = "navPoint")]
-pub struct NavPoint {
+struct NavPoint {
     #[serde(rename = "@id")]
     id: String,
     nav_label: Option<Text>,

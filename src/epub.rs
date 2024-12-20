@@ -11,10 +11,12 @@ const AUDIO_FOLDER_NAME:&str= "audios";
 
 
 /// epub规范版本
-pub enum Version {
-    V2,
-    V3,
+pub enum EpubVersion {
+    V20,
+    V30,
 }
+
+
 
 /// An epub file structure instance
 pub struct Epub {

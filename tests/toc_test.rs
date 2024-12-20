@@ -1,5 +1,5 @@
 use rust_epub;
-use rust_epub::epub::Version::*;
+use rust_epub::epub::EpubVersion::*;
 use rust_epub::toc::*;
 
 #[test]
@@ -22,7 +22,7 @@ fn encode_ncx_file() {
 
     nav.add_element(el1).add_element(el2);
 
-    let ret = nav.encode_file(V2);
+    let ret = nav.encode_file(V20);
     assert!(ret.is_ok());
     println!("{}", ret.unwrap());
 }
@@ -47,7 +47,7 @@ fn encode_nav_file() {
 
     nav.add_element(el1).add_element(el2);
 
-    let ret = nav.encode_file(V3);
+    let ret = nav.encode_file(V30);
 
      assert!(ret.is_ok());
 

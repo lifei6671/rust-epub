@@ -1,5 +1,5 @@
 use std::ptr::write;
-use rust_epub::epub::Version::V2;
+use rust_epub::epub::EpubVersion::V20;
 use rust_epub::toc;
 fn main() {
    let mut nav = toc::TocNav::new("梦回大明春","zh");
@@ -11,7 +11,7 @@ fn main() {
 
    nav.add_element(el1).add_element(el2);
 
-   let ret =  nav.encode_file(V2);
+   let ret =  nav.encode_file(V20);
    match ret {
       Ok(s) => println!("{}", s),
       Err(e) => println!("{:?}", e),

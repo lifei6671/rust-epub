@@ -1,61 +1,175 @@
-use std::time::SystemTime;
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename = "package")]
-pub struct Package {
+#[derive(Debug)]
+pub struct Package{
+    metadata: Vec<Metadata>,
 
 }
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename = "metadata")]
+#[derive(Debug)]
 pub struct Metadata {
-    #[serde(rename = "@xmlns:opf")]
-    xmlns_opf: String,
-    #[serde(rename = "@xmlns:dc")]
-    xmlns_dc :String,
-    #[serde(rename = "@xmlns:xsi")]
-    xmlns_xsi :String,
+    pub title: String,
+    pub creator: Vec<String>,
+    pub subject: Vec<String>,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub publisher: Option<String>,
+    pub contributor: Option<String>,
+    pub format: Option<String>,
+    pub identifier: Option<Identifier>,
+    pub source: Option<String>,
+    pub language: String,
+    pub relation: Option<String>,
+    pub coverage: Option<String>,
+    pub rights: Option<String>,
+    pub cover: Option<String>,
+    pub date_published: Option<chrono::DateTime<chrono::Utc>>,
+    pub date_modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub uuid: Option<uuid::Uuid>,
 
-    #[serde(rename = "dc:creator")]
-    creator : String,
-    #[serde(rename = "dc:title")]
-    title: String,
-    #[serde(rename = "dc:subject")]
-    subject : Option<String>,
-    #[serde(rename = "dc:description")]
-    description: Option<String>,
-    #[serde(rename = "dc:date")]
-    date : Option<String>,
-    #[serde(rename = "dc:type")]
-    category : Option<String>,
-    #[serde(rename = "dc:publisher")]
-    publisher:Option<String>,
-    #[serde(rename = "dc:contributor")]
-    contributor:Option<String>,
-    #[serde(rename = "dc:format")]
-    format : Option<String>,
-    #[serde(rename = "dc:identifier", skip_serializing_if="skip_if_empty_identifier")]
-    identifier : Option<Identifier>,
-    #[serde(rename = "dc:source")]
-    source : Option<String>,
-    #[serde(rename = "dc:language")]
-    language : Option<String>,
-    #[serde(rename = "dc:relation")]
-    relation : Option<String>,
-    #[serde(rename = "dc:coverage")]
-    coverage : Option<String>,
-    #[serde(rename = "dc:rights")]
-    rights : Option<String>,
-    #[serde(rename = "dc:cover")]
-    cover : Option<String>,
+    generator : String,
+    generator_name:String,
 
+    meta : Vec<MetaItem>,
+}
 
+impl Default for Metadata {
+    fn default() -> Self {
+        Metadata{
+            title: String::new(),
+            creator: vec![],
+            subject: vec![],
+            description: None,
+            category: None,
+            publisher: None,
+            contributor: None,
+            format: None,
+            identifier: None,
+            source: None,
+            language: String::from("zh"),
+            relation: None,
+            coverage: None,
+            rights: None,
+            cover: None,
+            date_published: None,
+            date_modified: None,
+            uuid: None,
+            generator : String::from("Rust EPUB library"),
+            generator_name: String::from("Table Of Contents"),
+            meta: Vec::new(),
+        }
+    }
 }
 
 impl Metadata {
-    pub fn new(title :String,creator :String) -> Metadata{
-        Metadata{
+    /// 增加自定义元数据
+    pub fn add_meta(&mut self, meta_item: MetaItem) ->&mut Self {
+        self.meta.push(meta_item);
+        self
+    }
+}
+
+/// 其他自定义元数据
+#[derive(Debug)]
+pub struct MetaItem {
+    pub refines :String,
+    pub property:String,
+    pub scheme:String,
+    pub id :String,
+    pub data :String,
+    pub name:String,
+    pub content:String,
+}
+
+impl Default for MetaItem {
+    fn default() -> Self {
+        MetaItem{
+            refines: String::new(),
+            property: String::new(),
+            scheme: String::new(),
+            id: String::new(),
+            data: String::new(),
+            name: String::new(),
+            content: String::new(),
+        }
+    }
+}
+
+/// 资源列表
+#[derive(Debug)]
+pub struct ManifestItem {
+    pub id: String,
+    pub href : String,
+    pub media_type: String,
+    pub properties: String,
+}
+
+impl Default for ManifestItem {
+    fn default() -> Self {
+        ManifestItem{
+            id: String::new(),
+            href: String::new(),
+            media_type: String::new(),
+            properties: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename = "package")]
+pub struct PackageOpf {}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename = "metadata")]
+pub struct MetadataOpf {
+    #[serde(rename = "@xmlns:opf")]
+    xmlns_opf: String,
+    #[serde(rename = "@xmlns:dc")]
+    xmlns_dc: String,
+    #[serde(rename = "@xmlns:xsi")]
+    xmlns_xsi: String,
+
+    #[serde(rename = "dc:creator")]
+    creator: String,
+    #[serde(rename = "dc:title")]
+    title: String,
+    #[serde(rename = "dc:subject")]
+    subject: Option<String>,
+    #[serde(rename = "dc:description")]
+    description: Option<String>,
+    #[serde(rename = "dc:date")]
+    date: Option<String>,
+    #[serde(rename = "dc:type")]
+    category: Option<String>,
+    #[serde(rename = "dc:publisher")]
+    publisher: Option<String>,
+    #[serde(rename = "dc:contributor")]
+    contributor: Option<String>,
+    #[serde(rename = "dc:format")]
+    format: Option<String>,
+    #[serde(
+        rename = "dc:identifier",
+        skip_serializing_if = "skip_if_empty_identifier"
+    )]
+    identifier: Option<Identifier>,
+    #[serde(rename = "dc:source")]
+    source: Option<String>,
+    #[serde(rename = "dc:language")]
+    language: Option<String>,
+    #[serde(rename = "dc:relation")]
+    relation: Option<String>,
+    #[serde(rename = "dc:coverage")]
+    coverage: Option<String>,
+    #[serde(rename = "dc:rights")]
+    rights: Option<String>,
+    #[serde(rename = "dc:cover")]
+    cover: Option<String>,
+}
+
+impl MetadataOpf {
+    pub fn new(title: String, creator: String) -> MetadataOpf {
+        MetadataOpf {
             xmlns_opf: "http://www.idpf.org/2007/opf".to_string(),
             xmlns_dc: "http://purl.org/dc/elements/1.1/".to_string(),
             xmlns_xsi: "http://www.w3.org/2001/XMLSchema-instance".to_string(),
@@ -79,7 +193,7 @@ impl Metadata {
     }
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct MetaItem {
+struct MetaItemOpf {
     #[serde(rename = "@content")]
     content: String,
     #[serde(rename = "@name")]
@@ -100,46 +214,45 @@ fn skip_if_empty_identifier(identifier: &Option<Identifier>) -> bool {
 #[serde(rename = "identifier")]
 pub struct Identifier {
     #[serde(rename = "@id", skip_serializing_if = "String::is_empty")]
-    id : String,
-    #[serde(rename = "opf:scheme",skip_serializing_if = "String::is_empty")]
-    scheme :String,
+    id: String,
+    #[serde(rename = "opf:scheme", skip_serializing_if = "String::is_empty")]
+    scheme: String,
     #[serde(rename = "$text")]
-    text : String,
+    text: String,
 }
-
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "manifest")]
-pub struct  Manifest {
+pub struct ManifestOpf {
     #[serde(rename = "item")]
-    items: Vec<Metadata>,
+    items: Vec<Item>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "metadata")]
 pub struct Item {
     #[serde(rename = "@id")]
-    id:String,
+    id: String,
     #[serde(rename = "@href")]
-    href:String,
+    href: String,
     #[serde(rename = "@media-type")]
-    media_type:String,
+    media_type: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "spine")]
 pub struct Spine {
     #[serde(rename = "@toc")]
-    toc :String,
+    toc: String,
     #[serde(rename = "itemref")]
-    items :Vec<Item>,
+    items: Vec<Item>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "spine")]
 pub struct SpineItem {
     #[serde(rename = "@idref")]
-    idref:String,
+    idref: String,
     #[serde(rename = "@properties")]
-    properties:String,
+    properties: String,
 }
