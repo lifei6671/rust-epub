@@ -1,16 +1,21 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-/// Folder names used for resources inside the EPUB
-
+#[allow(dead_code)]
 const CSS_FOLDER_NAME: &str  = "css";
+#[allow(dead_code)]
 const FONT_FOLDER_NAME:&str = "fonts";
+#[allow(dead_code)]
 const IMAGE_FOLDER_NAME:&str = "images";
+#[allow(dead_code)]
 const VIDEO_FOLDER_NAME:&str = "videos";
+#[allow(dead_code)]
 const AUDIO_FOLDER_NAME:&str= "audios";
 
 
 /// epub规范版本
+#[derive(Debug)]
+#[allow(dead_code)]
 pub enum EpubVersion {
     V20,
     V30,
@@ -19,6 +24,8 @@ pub enum EpubVersion {
 
 
 /// An epub file structure instance
+#[derive(Debug)]
+#[allow(dead_code)]
 pub struct Epub {
     /// Book creator
     creator : String,

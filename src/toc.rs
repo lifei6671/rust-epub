@@ -35,6 +35,7 @@ impl TocNav {
         self.elements.push(elem);
         self
     }
+    /// Encode toc file
     pub fn encode_file(&mut self, ver: EpubVersion) -> Result<String, super::Error> {
         match ver {
             EpubVersion::V20 => self.encode_ncx_file(),
@@ -44,16 +45,28 @@ impl TocNav {
 
     fn encode_ncx_file(&mut self) -> Result<String, super::Error> {
         let mut ncx = TocNCX::new(self.title.clone(), self.lang.clone());
-        for (_, (name, content)) in self.metadata.iter().enumerate() {
-            ncx.head.meta.push(MetaItem {
+
+        // self.metadata.iter().for_each(|(name, value)| {self.metadata.push((name.clone(), value.clone()));});
+        // for (_, (name, content)) in self.metadata.iter().enumerate() {
+        //     ncx.head.meta.push(MetaItem {
+        //         name: String::from(name),
+        //         content: String::from(content),
+        //     });
+        // }
+        self.metadata.
+            iter().
+            enumerate().
+            map(|(_, (name, value))| {
+            MetaItem {
                 name: String::from(name),
-                content: String::from(content),
-            });
-        }
+                content: String::from(value),
+            }
+        }).for_each(|meta| {ncx.head.meta.push(meta);});
+
         for el in self.elements.iter_mut() {
             ncx.nav_map.nav_point.push(NavPoint::from_toc_element(el));
         }
-        let mut ret = quick_xml::se::to_string(&ncx);
+        let ret = quick_xml::se::to_string(&ncx);
         match ret {
             Ok(s) => {
                 let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -68,17 +81,28 @@ impl TocNav {
 
     fn encode_nav_file(&mut self) -> Result<String, super::Error> {
         let mut html = Html::new(self.title.clone());
-        for (_, (name, content)) in self.metadata.iter().enumerate() {
-            html.head.meta.push(MetaItem {
-                name: String::from(name),
-                content: String::from(content),
-            });
-        }
+        // for (_, (name, content)) in self.metadata.iter().enumerate() {
+        //     html.head.meta.push(MetaItem {
+        //         name: String::from(name),
+        //         content: String::from(content),
+        //     });
+        // }
+         self.metadata.
+             iter().
+             enumerate().
+             map(|(_, (name, value))| {
+             MetaItem {
+                 name: String::from(name),
+                 content: String::from(value),
+             }
+         }).for_each(|meta| {html.head.meta.push(meta);});
+
+             // for_each(|(name, value)| {self.metadata.push((String::from(name), String::from(value)));});
 
         for el in self.elements.iter() {
             html.body.nav_toc.add_list(List::from_toc_element(el));
         }
-        let mut ret = quick_xml::se::to_string(&html);
+        let ret = quick_xml::se::to_string(&html);
         match ret {
             Ok(s) => {
                 let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -208,6 +232,7 @@ struct NavMap {
     nav_point: Vec<NavPoint>,
 }
 
+#[allow(dead_code)]
 impl NavMap {
     /// 将 TocElement 集合转换为epub v2版本的navMap结构
     fn from_toc_elements(elements: &[TocElement]) -> Self {
@@ -229,6 +254,7 @@ struct NavPoint {
     play_order: Option<i32>,
 }
 
+#[allow(dead_code)]
 impl NavPoint {
     pub fn new<S: Into<String>>(id: S, nav_label: String, content: String) -> NavPoint {
         NavPoint {
@@ -266,7 +292,7 @@ impl NavPoint {
         F: FnMut(&mut NavPoint),
     {
         let mut stack = vec![self];
-        while let Some(mut node) = stack.pop() {
+        while let Some(node) = stack.pop() {
             callback(node);
             for child in node.nav_element.iter_mut() {
                 stack.push(child);
@@ -421,6 +447,7 @@ struct List {
     order_list: Option<OrderList>,
 }
 
+#[allow(dead_code)]
 impl List {
     fn new<S1 :Into<String>,S2:Into<String>>(title : S1,href: S2) -> Self {
         List{
@@ -449,6 +476,7 @@ impl List {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename = "a")]
 struct Anchor {
     #[serde(rename = "@href")]
