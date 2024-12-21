@@ -12,6 +12,25 @@ const VIDEO_FOLDER_NAME:&str = "videos";
 #[allow(dead_code)]
 const AUDIO_FOLDER_NAME:&str= "audios";
 
+#[allow(dead_code)]
+const COVER_CSS_CONTENT:&str = "\
+body {
+  background-color: #FFFFFF;
+  margin-bottom: 0px;
+  margin-left: 0px;
+  margin-right: 0px;
+  margin-top: 0px;
+  text-align: center;
+}
+img {
+  max-height: 100%;
+  max-width: 100%;
+}";
+#[allow(dead_code)]
+const COVER_FILE_NAME: &str = "cover.xhtml";
+#[allow(dead_code)]
+const COVER_CSS_FILE:&str = "cover.css";
+
 
 /// epub规范版本
 #[derive(Debug)]
@@ -26,7 +45,7 @@ pub enum EpubVersion {
 /// An epub file structure instance
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct Epub {
+pub struct EpubBuilder {
     /// Book creator
     creator : String,
     /// Book title
@@ -72,3 +91,13 @@ pub struct Epub {
     audios: Vec<String>,
 
 }
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct Cover {
+    filename: String,
+    temp_filename: String,
+    image_filename: String,
+    xhtml_filename: String,
+}
+

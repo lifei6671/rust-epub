@@ -55,22 +55,38 @@ impl Package {
     }
 
     pub fn encode_xml(&self,ver : EpubVersion) -> Result<String, super::Error> {
+        let mut xml : PackageOpf;
         match ver {
-            EpubVersion::V20 => self.encode_v2_xml(),
-            EpubVersion::V30 => self.encode_v3_xml(),
+            EpubVersion::V20 => {
+                xml = self.encode_v2_xml()
+            },
+            EpubVersion::V30 => {
+                xml = self.encode_v3_xml()
+            },
+        }
+        self.convert_metadata(&mut xml);
+        self.convert_manifest(&mut xml);
+        self.convert_spine(&mut xml);
+        self.convert_guide(&mut xml);
+
+        let ret = quick_xml::se::to_string(&xml);
+
+        match ret {
+            Ok(s) => Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>{}",s)),
+            Err(e) => Err(super::Error::NonEncodable(e.to_string())),
         }
     }
 
-    fn encode_v2_xml(&self) -> Result<String, super::Error> {
+    fn encode_v2_xml(&self) -> PackageOpf {
         let creator = self.metadata.creator.first().unwrap_or(&"".to_string()).clone();
-        let mut xml = PackageOpf::new(EpubVersion::V20, self.metadata.title.clone(), creator);
-        self.convert_metadata(&mut xml);
-        self.convert_manifest(&mut xml);
-
-       quick_xml::se::to_string(&xml).map_err(|e| super::Error::NonEncodable(e.to_string()))
+        let xml = PackageOpf::new(EpubVersion::V20, self.metadata.title.clone(), creator);
+        xml
     }
-    fn encode_v3_xml(&self) -> Result<String, super::Error> {
-        Ok("".to_string())
+    fn encode_v3_xml(&self) -> PackageOpf {
+        let creator = self.metadata.creator.first().unwrap_or(&"".to_string()).clone();
+        let mut xml = PackageOpf::new(EpubVersion::V30, self.metadata.title.clone(), creator);
+        self.convert_binding(&mut xml);
+        xml
     }
 
     fn convert_metadata<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
@@ -125,6 +141,41 @@ impl Package {
                 href: m.href.clone(),
                 media_type: m.media_type.clone(),
             }));
+        xml
+    }
+
+    fn convert_spine<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
+        self.spine
+            .iter()
+            .for_each(|s| xml.spine.items.push(SpineItemRefOpf{
+                idref: s.idref.clone(),
+                properties: None,
+            }));
+        xml
+    }
+
+    fn convert_guide<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
+        self.guide
+            .iter()
+            .for_each(|g| xml.guide.items.push(GuideReferenceItemOpf{
+                ref_type: g.ref_type.clone(),
+                href: g.href.clone(),
+                title: g.title.clone(),
+            }));
+        xml
+    }
+
+    fn convert_binding<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
+        // 如果 xml.binding 为 None，则初始化它
+        xml.binding.get_or_insert_with(|| BindingOpf {
+            items: Vec::new(),
+        });
+        // 遍历 self.bindings 并添加到 xml.binding.items 中
+        if let Some(binding) = &mut xml.binding {
+            self.bindings.iter().for_each(|b| {
+                binding.items.push(BindingItemOpf::new(b.media_type.clone(), b.href.clone()));
+            });
+        }
         xml
     }
 }
@@ -369,20 +420,21 @@ pub struct Identifier {
 #[allow(dead_code)]
 pub struct SpineItemRef {
     pub idref: String,
+    pub properties: Option<String>,
 }
 
 /// epub spine item ref
 impl Default for SpineItemRef {
     /// Create a new spine item ref
     fn default() -> Self {
-        SpineItemRef { idref: String::new() }
+        SpineItemRef { idref: String::new(), properties: None }
     }
 }
 /// epub spine item ref
 impl SpineItemRef {
     /// Create a new spine item ref
     pub fn new<S: Into<String>>(idref: S) -> SpineItemRef {
-        SpineItemRef { idref: idref.into() }
+        SpineItemRef { idref: idref.into(), properties: None }
     }
 }
 
@@ -448,9 +500,12 @@ struct PackageOpf {
     #[serde(rename = "manifest")]
     manifest: ManifestOpf,
     #[serde(rename = "spine")]
-    spine: Vec<SpineOpf>,
+    spine: SpineOpf,
     #[serde(rename = "guide")]
-    guide: Vec<GuideReferenceOpf>,
+    guide: GuideReferenceOpf,
+
+    #[serde(rename = "bindings", skip_serializing_if = "Option::is_none")]
+    binding :Option<BindingOpf>,
 
     #[serde(rename = "@version")]
     version : String,
@@ -473,9 +528,10 @@ impl PackageOpf {
         PackageOpf {
             metadata: MetadataOpf::new(title,creator),
             manifest: ManifestOpf::default(),
-            spine: Vec::new(),
-            guide: Vec::new(),
+            spine: SpineOpf::default(),
+            guide: GuideReferenceOpf::default(),
             version:  match ver { EpubVersion::V20=> String::from("v2.0"),EpubVersion::V30=>String::from("v3.0") ,},
+            binding: Some(BindingOpf::default()),
             xmlns_opf,
             xmlns_dc,
             xmlns_xsi,
@@ -524,7 +580,6 @@ struct MetadataOpf {
     #[serde(rename = "meta", skip_serializing_if = "Vec::is_empty")]
     meta: Vec<MetaItemOpf>,
 }
-
 
 
 impl MetadataOpf {
@@ -605,31 +660,47 @@ struct ManifestItemOpf {
     media_type: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug,  Serialize, Deserialize)]
 #[serde(rename = "spine")]
 struct SpineOpf {
     #[serde(rename = "@toc")]
     toc: String,
     #[serde(rename = "itemref")]
-    items: Vec<SpineItemOpf>,
+    items: Vec<SpineItemRefOpf>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+impl Default for SpineOpf {
+    fn default() -> Self {
+        SpineOpf {
+            toc: String::from("toc"),
+            items: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug,  Serialize, Deserialize)]
 #[serde(rename = "spine")]
-struct SpineItemOpf {
+struct SpineItemRefOpf {
     #[serde(rename = "@idref")]
     idref: String,
-    #[serde(rename = "@properties")]
-    properties: String,
+    #[serde(rename = "@properties", skip_serializing_if = "Option::is_none")]
+    properties: Option<String>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "guide ")]
 struct GuideReferenceOpf {
-    #[serde(rename = "reference")]
+    #[serde(rename = "reference", skip_serializing_if = "Vec::is_empty")]
     items: Vec<GuideReferenceItemOpf>,
 }
-#[derive(Debug, Default, Serialize, Deserialize)]
+
+impl Default for GuideReferenceOpf {
+    fn default() -> Self {
+        GuideReferenceOpf { items: Vec::new() }
+    }
+}
+
+#[derive(Debug,  Serialize, Deserialize)]
 #[serde(rename = "reference ")]
 struct GuideReferenceItemOpf {
     #[serde(rename = "@type")]
@@ -640,3 +711,33 @@ struct GuideReferenceItemOpf {
     href: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename = "bindings ")]
+struct BindingOpf {
+    #[serde(rename = "binding", skip_serializing_if = "Vec::is_empty")]
+    items : Vec<BindingItemOpf>,
+}
+
+impl Default for BindingOpf {
+    fn default() -> Self {
+        BindingOpf { items: Vec::new() }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
+struct BindingItemOpf {
+    #[serde(rename = "@media-type",skip_serializing_if = "String::is_empty")]
+    media_type:String,
+    #[serde(rename = "@href",skip_serializing_if = "String::is_empty")]
+    href:String,
+}
+
+impl BindingItemOpf {
+    fn new<S:Into<String>>(media_type: S, href: S) -> BindingItemOpf {
+        BindingItemOpf {
+            media_type: media_type.into(),
+            href: href.into(),
+        }
+    }
+}

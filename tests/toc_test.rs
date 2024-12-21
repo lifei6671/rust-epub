@@ -50,5 +50,5 @@ fn encode_nav_file() {
     let ret = nav.encode_file(V30);
 
      assert!(ret.is_ok());
-
+    println!("{}", ret.unwrap());
 }
