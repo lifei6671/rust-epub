@@ -29,8 +29,6 @@ impl Default for XHtmlRoot {
 
 impl XHtmlRoot {
     pub fn set_body<S: Into<String>>(&mut self, body: S) -> &mut Self {
-        let ret = quick_xml::de::from_str(&*body.into().clone());
-
         self.body.content = body.into();
         self
     }
