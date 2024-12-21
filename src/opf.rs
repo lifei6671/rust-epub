@@ -24,8 +24,13 @@ impl Package {
         }
     }
     /// Add a metadata item to the package
-    pub fn add_metadata(&mut self, metadata: MetaItem) -> &mut Self {
+    pub fn add_other_metadata(&mut self, metadata: MetaItem) -> &mut Self {
         self.metadata.meta.push(metadata);
+        self
+    }
+    /// Set the metadata for the package
+    pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
+        self.metadata = metadata;
         self
     }
     /// Add a manifest item to the package
@@ -58,14 +63,69 @@ impl Package {
 
     fn encode_v2_xml(&self) -> Result<String, super::Error> {
         let creator = self.metadata.creator.first().unwrap_or(&"".to_string()).clone();
-        let xml = PackageOpf::new(EpubVersion::V20, self.metadata.title.clone(), creator);
-
-
+        let mut xml = PackageOpf::new(EpubVersion::V20, self.metadata.title.clone(), creator);
+        self.convert_metadata(&mut xml);
+        self.convert_manifest(&mut xml);
 
        quick_xml::se::to_string(&xml).map_err(|e| super::Error::NonEncodable(e.to_string()))
     }
     fn encode_v3_xml(&self) -> Result<String, super::Error> {
         Ok("".to_string())
+    }
+
+    fn convert_metadata<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
+        xml.metadata.title = self.metadata.title.clone();
+        xml.metadata.creator = self.metadata.creator.join(",");
+        xml.metadata.subject = Some(self.metadata.subject.join(","));
+        xml.metadata.description = self.metadata.description.clone();
+        xml.metadata.date = self.metadata.date_published.map(|d| d.format("%Y-%m-%dT%H:%M:%S %z").to_string());
+        if let Some(ref date) = self.metadata.date_modified {
+            xml.metadata.meta.push(MetaItemOpf{
+                name:None,
+                text: date.format("%Y-%m-%dT%H:%M:%S %z").to_string(),
+                property: Some(String::from("dcterms:modified")),
+            });
+        }
+        xml.metadata.category = self.metadata.category.clone();
+        xml.metadata.publisher = self.metadata.publisher.clone();
+        xml.metadata.contributor = self.metadata.contributor.clone();
+        xml.metadata.rights = self.metadata.rights.clone();
+        xml.metadata.format = self.metadata.format.clone();
+        xml.metadata.source = self.metadata.source.clone();
+        xml.metadata.language = Some(self.metadata.language.clone());
+        xml.metadata.relation = self.metadata.relation.clone();
+        xml.metadata.coverage = self.metadata.coverage.clone();
+
+        self.metadata.meta.iter().for_each(|m| {
+            xml.metadata.meta.push(MetaItemOpf{
+                name: Some(m.name.clone()),
+                text: m.data.clone(),
+                property: Some(m.property.clone()),
+            });
+        });
+        xml.metadata.meta.push(MetaItemOpf{
+            name: Some(String::from("generator")),
+            text: self.metadata.generator.clone(),
+            property: None,
+        });
+        xml.metadata.meta.push(MetaItemOpf{
+            name : Some(String::from("generator-name")),
+            text: self.metadata.generator_name.clone(),
+        property: None,
+        });
+
+        xml
+    }
+
+    fn convert_manifest<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
+        self.manifest
+            .iter()
+            .for_each(|m| xml.manifest.items.push(ManifestItemOpf{
+                id: m.id.clone(),
+                href: m.href.clone(),
+                media_type: m.media_type.clone(),
+            }));
+        xml
     }
 }
 
@@ -89,7 +149,6 @@ pub struct Metadata {
     pub cover: Option<String>,
     pub date_published: Option<chrono::DateTime<chrono::Utc>>,
     pub date_modified: Option<chrono::DateTime<chrono::Utc>>,
-    pub uuid: Option<uuid::Uuid>,
 
     generator: String,
     generator_name: String,
@@ -118,7 +177,6 @@ impl Default for Metadata {
             cover: None,
             date_published: None,
             date_modified: None,
-            uuid: None,
             generator: String::from("Rust EPUB library"),
             generator_name: String::from("Table Of Contents"),
             meta: Vec::new(),
@@ -130,6 +188,86 @@ impl Metadata {
     /// 增加自定义元数据
     pub fn add_meta(&mut self, meta_item: MetaItem) -> &mut Self {
         self.meta.push(meta_item);
+        self
+    }
+    /// set meta title
+    pub fn set_title<S: Into<String>>(&mut self, title: S) -> &mut Self {
+        self.title = title.into();
+        self
+    }
+    /// set meta creator
+    pub fn set_creator<S: Into<String>>(&mut self, creator: S) -> &mut Self {
+        self.creator.push(creator.into());
+        self
+    }
+    /// set meta subject
+    pub fn set_subject<S: Into<String>>(&mut self, subject: S) -> &mut Self {
+        self.subject.push(subject.into());
+        self
+    }
+    /// set meta description
+    pub fn set_description<S: Into<String>>(&mut self, description: S) -> &mut Self {
+        self.description = Some(description.into());
+        self
+    }
+    /// set meta category
+    pub fn set_category<S: Into<String>>(&mut self, category: S) -> &mut Self {
+        self.category = Some(category.into());
+        self
+    }
+    /// set meta publisher
+    pub fn set_publisher<S: Into<String>>(&mut self, publisher: S) -> &mut Self {
+        self.publisher = Some(publisher.into());
+        self
+    }
+    /// set meta contributor
+    pub fn set_contributor<S: Into<String>>(&mut self, contributor: S) -> &mut Self {
+        self.contributor = Some(contributor.into());
+        self
+    }
+    /// set meta format
+    pub fn set_format<S: Into<String>>(&mut self, format: S) -> &mut Self {
+        self.format = Some(format.into());
+        self
+    }
+    /// set meta identifier
+    pub fn set_identifier(&mut self, identifier: Identifier) -> &mut Self {
+        self.identifier = Some(identifier);
+        self
+    }
+    /// set meta source
+    pub fn set_source<S: Into<String>>(&mut self, source: S) -> &mut Self {
+        self.source = Some(source.into());
+        self
+    }
+    /// set meta language
+    pub fn set_language<S: Into<String>>(&mut self, language: S) -> &mut Self {
+        self.language = language.into();
+        self
+    }
+    /// set meta relation
+    pub fn set_relation<S: Into<String>>(&mut self, relation: S) -> &mut Self {
+        self.relation = Some(relation.into());
+        self
+    }
+    /// set meta coverage
+    pub fn set_cover<S: Into<String>>(&mut self, cover: S) -> &mut Self {
+        self.coverage = Some(cover.into());
+        self
+    }
+    /// set meta rights
+    pub fn set_rights<S: Into<String>>(&mut self, rights: S) -> &mut Self {
+        self.rights = Some(rights.into());
+        self
+    }
+    /// set published date
+    pub fn set_date_published<D: Into<chrono::DateTime<chrono::Utc>>>(&mut self, date_published: D) -> &mut Self {
+        self.date_published = Some(date_published.into());
+        self
+    }
+    /// set modified date
+    pub fn set_date_modified<D: Into<chrono::DateTime<chrono::Utc>>>(&mut self, date_modified: D) -> &mut Self {
+        self.date_modified = Some(date_modified.into());
         self
     }
 }
@@ -186,10 +324,10 @@ pub struct Manifest {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct ManifestItem {
-    id: String,
-    href: String,
-    media_type: String,
-    properties: String,
+    pub id: String,
+    pub href: String,
+    pub media_type: String,
+    pub properties: String,
 }
 
 /// epub manifest item
@@ -308,7 +446,7 @@ struct PackageOpf {
     #[serde(rename = "metadata")]
     metadata: MetadataOpf,
     #[serde(rename = "manifest")]
-    manifest: Vec<ManifestOpf>,
+    manifest: ManifestOpf,
     #[serde(rename = "spine")]
     spine: Vec<SpineOpf>,
     #[serde(rename = "guide")]
@@ -334,7 +472,7 @@ impl PackageOpf {
         let xmlns_xsi = match ver { EpubVersion::V20=>"".to_string(),EpubVersion::V30=>"http://www.w3.org/2001/XMLSchema-instance".to_string() ,};
         PackageOpf {
             metadata: MetadataOpf::new(title,creator),
-            manifest: Vec::new(),
+            manifest: ManifestOpf::default(),
             spine: Vec::new(),
             guide: Vec::new(),
             version:  match ver { EpubVersion::V20=> String::from("v2.0"),EpubVersion::V30=>String::from("v3.0") ,},
@@ -377,10 +515,11 @@ struct MetadataOpf {
     relation: Option<String>,
     #[serde(rename = "dc:coverage", skip_serializing_if = "Option::is_none")]
     coverage: Option<String>,
-    #[serde(rename = "dc:rights", skip_serializing_if = "Vec::is_empty")]
-    rights: Vec<String>,
+    #[serde(rename = "dc:rights", skip_serializing_if = "Option::is_none")]
+    rights: Option<String>,
     #[serde(rename = "dc:cover", skip_serializing_if = "Option::is_none")]
     cover: Option<String>,
+
 
     #[serde(rename = "meta", skip_serializing_if = "Vec::is_empty")]
     meta: Vec<MetaItemOpf>,
@@ -405,18 +544,21 @@ impl MetadataOpf {
             language: None,
             relation: None,
             coverage: None,
-            rights: Vec::new(),
+            rights: None,
             cover: None,
             meta: Vec::new(),
         }
     }
 }
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename = "meta")]
 struct MetaItemOpf {
-    #[serde(rename = "@content")]
-    content: String,
-    #[serde(rename = "@name")]
-    name: String,
+    #[serde(rename = "$text", skip_serializing_if = "String::is_empty")]
+    text: String,
+    #[serde(rename = "@name", skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(rename = "@property",skip_serializing_if = "Option::is_none")]
+    property: Option<String>,
 }
 
 /// 自定义结构体的序列化条件
@@ -440,15 +582,20 @@ struct IdentifierOpf {
     text: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename = "manifest")]
+#[derive(Debug, Serialize, Deserialize)]
 struct ManifestOpf {
-    #[serde(rename = "item")]
+    #[serde(rename = "item", skip_serializing_if = "Vec::is_empty")]
     items: Vec<ManifestItemOpf>,
 }
 
+impl Default for  ManifestOpf {
+    fn default() -> Self {
+        ManifestOpf { items: Vec::new() }
+    }
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename = "metadata")]
+#[serde(rename = "item")]
 struct ManifestItemOpf {
     #[serde(rename = "@id")]
     id: String,
