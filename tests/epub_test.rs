@@ -71,7 +71,7 @@ fn test_add_section() {
     let parent_filename = ret.unwrap();
     assert_eq!(parent_filename, "section_1.xhtml");
 
-    let sub_ret = epub.add_section(Some(parent_filename), "测试章节2", "测试章节内容2", None, None);
+    let sub_ret = epub.add_section(Some(parent_filename), "测试章节2", "测试章节内容2", None, Some(current_dir));
     println!("{:?}", sub_ret);
     assert!(sub_ret.is_ok());
 }

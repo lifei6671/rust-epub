@@ -2,7 +2,6 @@ use crate::mime::first;
 use crate::xhtml::{XHtmlLinkItem, XHtmlRoot};
 use crate::Error;
 use dashmap::{DashMap, DashSet};
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -50,9 +49,9 @@ pub enum EpubVersion {
 #[allow(dead_code)]
 pub struct EpubBuilder {
     /// Book title
-    title: Mutex<String>,
+    title: String,
     /// Book creator
-    creator: Option<String>,
+    creator: Vec<String>,
     /// Book subject
     subject: Option<String>,
     /// Book description
@@ -84,7 +83,7 @@ pub struct EpubBuilder {
     cover: Option<Arc<Mutex<Cover>>>,
 
     /// Book other metadata
-    metadata: Option<HashMap<String, String>>,
+    metadata: Option<DashMap<String, String>>,
 
     /// Custom style sheet collection
     stylesheet: DashMap<String, String>,
@@ -114,8 +113,8 @@ impl EpubBuilder {
     #[allow(dead_code)]
     pub fn new<S: Into<String>>(title: S) -> EpubBuilder {
         EpubBuilder {
-            title: Mutex::from(title.into()),
-            creator: None,
+            title: title.into(),
+            creator: Vec::new(),
             subject: None,
             description: None,
             date: None,
@@ -141,7 +140,82 @@ impl EpubBuilder {
         }
     }
 
-    /// Add a image file to the epub
+    /// Set the epub identifier
+    pub fn set_id<S: Into<String>>(&mut self, id: S) -> &mut Self {
+        self.identifier = Some(id.clone());
+        self
+    }
+    /// Set the epub format
+    pub fn set_format<S: Into<String>>(&mut self, format: S) -> &mut Self {
+        self.format = Some(format.into());
+        self
+    }
+    /// Set the epub publisher
+    pub fn set_publisher<S: Into<String>>(&mut self, publisher: S) -> &mut Self {
+        self.publisher = Some(publisher.into());
+        self
+    }
+    /// Set the epub category
+    pub fn set_category<S: Into<String>>(&mut self, category: S) -> &mut Self {
+        self.category = Some(category.into());
+        self
+    }
+    /// Set the epub date
+    pub fn set_date(&mut self, date: SystemTime) -> &mut Self {
+        self.date = Some(date);
+        self
+    }
+    /// Set the epub description
+    pub fn set_description<S: Into<String>>(&mut self, description: S) -> &mut Self {
+        self.description = Some(description.into());
+        self
+    }
+    /// Set the epub subject
+    pub fn set_subject<S: Into<String>>(&mut self, subtitle: S) -> &mut Self {
+        self.title = subtitle.into();
+        self
+    }
+    /// Set the epub title
+    pub fn set_title<S: Into<String>>(&mut self, title: S) -> &mut Self {
+        self.title = title.into();
+        self
+    }
+    /// Set the epub source
+    pub fn set_source<S: Into<String>>(&mut self, source: S) -> &mut Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Set the epub language
+    pub fn set_language<S: Into<String>>(&mut self, language: S) -> &mut Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    /// Set the epub relation
+    pub fn set_relation<S: Into<String>>(&mut self, relation: S) -> &mut Self {
+        self.relation = Some(relation.into());
+        self
+    }
+
+    /// Set the epub right
+    pub fn set_right<S: Into<String>>(&mut self, rights: S) -> &mut Self {
+        self.rights = Some(rights.into());
+        self
+    }
+
+
+    /// Add a metadata key-value pair to the epub
+    pub fn add_metadata<S: Into<String>>(&mut self, key: S, value: S) -> &mut Self {
+        if self.metadata.is_none() {
+            self.metadata = Some(DashMap::new());
+        }
+        let metadata = &mut self.metadata;
+        metadata.as_mut().unwrap().insert(key.into(), value.into());
+        self
+    }
+
+    /// Add an image file to the epub
     pub fn add_image<S1: Into<String>>(
         &mut self,
         source: S1,
@@ -173,7 +247,7 @@ impl EpubBuilder {
         )
     }
 
-    /// Add a audio file to the epub
+    /// Add an audio file to the epub
     pub fn add_audio<S1: Into<String>>(
         &mut self,
         source: S1,
@@ -231,27 +305,12 @@ impl EpubBuilder {
         self.remove_cover_resources()?;
 
         // 添加封面图片到资源列表中
-        let image_filename = self.add_image(raw_image_path.clone(), None);
-        let cover_image_filename: String;
-        match image_filename {
-            Ok(image_filename) => {
-                cover_image_filename = image_filename;
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        }
+        let cover_image_filename = self.add_image(raw_image_path.clone(), None)?;
+
+
         let body = format!("<img src=\"{}\" alt=\"cover\"/>", cover_image_filename);
-        let xhtml_ret = self.add_section(None, body, "封面", Some(String::from("cover.xhtml")), internal_css_path);
-        let cover_xhtml_filename: String;
-        match xhtml_ret {
-            Ok(xhtml_filename) => {
-                cover_xhtml_filename = xhtml_filename;
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        }
+        let cover_xhtml_filename = self.add_section(None, body, "封面", Some(String::from(COVER_FILE_NAME)), internal_css_path)?;
+
 
         // 添加新封面
         let cover = self.cover.get_or_insert_with(|| Arc::new(Mutex::new(Cover::default())));
@@ -306,20 +365,14 @@ impl EpubBuilder {
                 parent_current_filename = p_filename;
             }
         }
+
         let mut section = Section::new(base_filename.clone());
         section.xhtml.set_body(body.into());
         section.xhtml.set_title(section_title.into());
 
         if let Some(css_path) = internal_css_path {
-            let base_css_path = self.add_stylesheet(css_path, None);
-            match base_css_path {
-                Ok(p) => {
-                    section.xhtml.add_link(XHtmlLinkItem::new(p, "text/css", None));
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
+            let base_css_path = self.add_stylesheet(css_path, None)?;
+            section.xhtml.add_link(XHtmlLinkItem::new(base_css_path, "text/css", None));
         }
         if !parent_current_filename.is_empty() {
             let mut target_section = None;
@@ -388,6 +441,10 @@ impl EpubBuilder {
             // 移除封面图片
             self.images.remove(&cover.image_filename);
         }
+        Ok(())
+    }
+
+    pub fn output(&self, output_path: &Path) -> Result<(), Error> {
         Ok(())
     }
 }
