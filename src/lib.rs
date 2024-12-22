@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
 pub mod epub;
 pub mod toc;
 pub mod opf;
@@ -25,4 +28,61 @@ pub enum Error {
     /// Encoding error
     NonEncodable(String),
 
+    /// Mime type error
+    MimeError(String),
+
+    /// Path conversion error
+    PathConversionErr(String),
+    /// File not found error
+    FileNotFoundErr(String),
+
+}
+fn combine_dirs(dir_names: &[&str]) -> String {
+    let mut path = PathBuf::new();
+    for dir_name in dir_names {
+        path = path.join(dir_name);
+    }
+    path.to_str().unwrap().to_string()
+}
+fn add_media<S1: Into<String>, S2: Into<String>>(
+    source: S1,
+    internal_filename: Option<String>,
+    media_file_format: String,
+    media_folder_name: S2,
+    hashmap: &mut HashMap<String, String>,
+) -> Result<String, Error> {
+    let source_str = source.into();
+    /// Check if file exists
+    if !Path::new(&source_str).exists() {
+        return Err(Error::FileNotFoundErr(format!(
+            "File not found:{}",
+            &source_str
+        )));
+    }
+    // 判断是否指定了内部文件名
+    let filename = if let Some(internal_filename) = internal_filename {
+        internal_filename
+    } else {
+        let file_path = Path::new(&source_str);
+        let basename = file_path.file_name().unwrap().to_str().unwrap();
+        /// 判断文件名是否过长或是否已被使用
+        if basename.len() > 255 || hashmap.contains_key(basename) {
+            let ext = file_path
+                .extension()
+                .and_then(|osstr| osstr.to_str())
+                .unwrap_or("jpg");
+            format!("{}_{}.{}", media_file_format, hashmap.len() + 1, ext)
+        } else {
+            String::from(basename)
+        }
+    };
+
+    if hashmap.contains_key(&filename) {
+        return Err(Error::FilenameUsedErr(format!(
+            "Filename already used:{}",
+            &filename
+        )));
+    }
+    hashmap.insert(filename.clone(), source_str);
+    Ok(format!("../{}/{}", media_folder_name.into(), filename))
 }

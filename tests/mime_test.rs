@@ -1,4 +1,4 @@
-use rust_epub::mime::{first_or_octet_stream, from_path, get_mime_type};
+use rust_epub::mime::{first, first_or_octet_stream, from_path, get_mime_type};
 use std::ffi::OsStr;
 use std::path::Path;
 
@@ -38,4 +38,12 @@ fn test_first_or_octet_stream() {
     assert_eq!(ext_str.unwrap(), "mp4");
     let ext = first_or_octet_stream(String::from(ext_str.unwrap()));
     assert_eq!(ext, "video/mp4");
+}
+
+
+#[test]
+fn test_first() {
+    let mime_str = first("tests/resources/mimes.mp4");
+    assert!(mime_str.is_some());
+    println!("{:?}", mime_str);
 }

@@ -20,13 +20,21 @@ pub fn from_path<P: AsRef<Path>>(path: P) -> Option<String> {
 
 /// 获取mime类型,如果获取失败则返回默认类型
 pub fn first_or_octet_stream(ext: String) -> String {
-    // get_mime_type(&ext).and_then(|m| m.get(0).cloned()).unwrap_or_else(|| "application/octet-stream".to_string())
     MIME_TYPES
         .iter()
         .find(|(k, _)| k == &ext)
         .map(|(_, v)| String::from(*v.get(0).unwrap_or(&MIME_DEFAULT)))
         .unwrap_or(ext)
         .to_string()
+}
+
+/// 获取mime类型，如果获取成功则返回mime类型
+pub fn first<S:Into<String>>(filename:S) -> Option<String>{
+    Path::new(filename.into().as_str()).extension().
+        and_then(|ext|{OsStr::to_str(ext)}).
+        and_then(|ext|{
+            MIME_TYPES.iter().find(|(k, _)| *k == ext).map(|(_, v)| String::from(*v.get(0).unwrap()))
+        })
 }
 
 /// 获取mime类型，如果获取成功则返回mime类型列表

@@ -1,7 +1,5 @@
-use quick_xml::DeError;
 use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::SerializeStruct;
-use serde_with::{serde_as, NoneAsEmptyString, SerializeAs};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "html")]
@@ -28,37 +26,48 @@ impl Default for XHtmlRoot {
 }
 
 impl XHtmlRoot {
+    /// Set the body
     pub fn set_body<S: Into<String>>(&mut self, body: S) -> &mut Self {
         self.body.content = body.into();
         self
     }
+    /// Set the title
     pub fn set_title<S: Into<String>>(&mut self, title: S) -> &mut Self {
         self.head.title = XHtmlTitle::new(title);
         self
     }
+    /// Add a link
     pub fn add_link(&mut self, link: XHtmlLinkItem) -> &mut Self {
         self.head.add_link(link);
         self
     }
+    /// Add a style
     pub fn add_style(&mut self, style: StyleContent) -> &mut Self {
         self.head.add_style(style);
         self
     }
+    /// Add a style content
     pub fn add_style_content<S: Into<String>>(&mut self, style: S) -> &mut Self {
         self.head
             .style_content
             .push(StyleContent::new(style, String::from("text/css")));
         self
     }
-
+    /// Encode the XML string
     pub fn encode_xml(&mut self) -> Result<String, super::Error> {
+        let body = self.body.content.clone();
+        self.body.content = String::from("{body}");
         let ret = quick_xml::se::to_string(self);
 
         match ret {
-            Ok(s) => Ok(format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><!DOCTYPE html>{}",
-                s
-            )),
+            Ok(s) => {
+                let xml_str = format!(
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><!DOCTYPE html>{}",
+                    s.replace("{body}", &body)
+                );
+                self.body.content = body;
+                Ok(xml_str)
+            },
             Err(e) => Err(super::Error::NonEncodable(e.to_string())),
         }
     }
@@ -148,7 +157,7 @@ impl XHtmlHead {
 struct XHtmlTitle {
     #[serde(rename = "$text")]
     text: String,
-    #[serde(rename = "@dir", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "@dir", skip_serializing_if = "is_none_or_empty")]
     dir: Option<String>,
 }
 
@@ -216,12 +225,10 @@ impl XHtmlLinkItem {
 }
 
 #[derive(Debug, Serialize,Deserialize)]
-#[serde_as]
 struct XHtmlBody{
-    #[serde(rename = "$text", serialize_with = "serialize_raw_xml")]
+    #[serde(rename = "$text")]
     content: String,
-    #[serde(rename = "@dir")]
-    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(rename = "@dir", skip_serializing_if = "Option::is_none")]
     dir: Option<String>,
 }
 
@@ -239,26 +246,8 @@ impl XHtmlBody{
     }
 }
 
-fn partial_escape<S>(s: &str, ser: S) -> std::result::Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    ser.serialize_str(&quick_xml::escape::partial_escape(s),)
-}
-
-fn serialize_raw_xml<S>(value: &String, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    // serializer.serialize_str(value)
-    serializer.collect_str(value)
-}
 
 // 自定义函数：判断 Option<String> 是否应跳过序列化
 fn is_none_or_empty(value: &Option<String>) -> bool {
-    match value {
-        None => true,                           // 如果是 None，跳过序列化
-        Some(s) if s.trim().is_empty() => true, // 如果字符串为空白，跳过序列化
-        _ => false,                             // 否则不跳过
-    }
+    value.is_none() || value.as_ref().unwrap().trim().is_empty()
 }
