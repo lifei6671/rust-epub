@@ -1,5 +1,4 @@
-use serde::{Deserialize, Serialize, Serializer};
-use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "html")]
@@ -74,6 +73,7 @@ impl XHtmlRoot {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XHtmlHead {
     #[serde(rename = "@lang", skip_serializing_if = "String::is_empty")]
     lang: String,
@@ -127,26 +127,31 @@ impl StyleContent {
 
 impl XHtmlHead {
     /// sets the language of the head.
+    #[allow(dead_code)]
     pub fn set_lang<S: Into<String>>(mut self, lang: S) -> Self {
         self.lang = lang.into();
         self
     }
     /// Sets the title of the head.
+    #[allow(dead_code)]
     pub fn set_title<S: Into<String>>(mut self, title: S) -> Self {
         self.title = XHtmlTitle::new(title);
         self
     }
     /// Adds a style to the head.
+    #[allow(dead_code)]
     pub fn add_style(&mut self, style: StyleContent) -> &mut Self {
         self.style_content.push(style);
         self
     }
     /// Adds a style content to the head.
+    #[allow(dead_code)]
     pub fn add_style_content<S: Into<String>>(mut self, style: S) -> Self {
         self.style_content.push(StyleContent::new(style, String::from("text/css")));
         self
     }
     /// Adds a link to the head.
+    #[allow(dead_code)]
     pub fn add_link(&mut self, link: XHtmlLinkItem) -> &mut Self {
         self.link.push(link);
         self
@@ -154,6 +159,7 @@ impl XHtmlHead {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XHtmlTitle {
     #[serde(rename = "$text")]
     text: String,
@@ -177,6 +183,7 @@ impl XHtmlTitle {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct XHtmlLink {
     #[serde(rename = "link", skip_serializing_if = "Vec::is_empty")]
     link: Vec<XHtmlLinkItem>,
@@ -192,6 +199,7 @@ impl XHtmlLink {
     fn new() -> Self {
         XHtmlLink { link: Vec::new() }
     }
+    #[allow(dead_code)]
     fn add_link(mut self, link: XHtmlLinkItem) -> Self {
         self.link.push(link);
         self
@@ -210,15 +218,15 @@ pub struct XHtmlLinkItem {
 
 impl Default for XHtmlLinkItem {
     fn default() -> Self {
-        XHtmlLinkItem::new(String::new(), String::new(), String::from("stylesheet"))
+        XHtmlLinkItem::new(String::new(), String::new(), Some(String::from("stylesheet")))
     }
 }
 
 impl XHtmlLinkItem {
-    pub fn new<S1: Into<String>,S2:Into<String>,S3:Into<String>>(href: S1, link_type: S2, rel: S3) -> Self {
+    pub fn new<S1: Into<String>, S2: Into<String>>(href: S1, link_type: S2, rel: Option<String>) -> Self {
         XHtmlLinkItem {
             href: href.into(),
-            rel: Some(rel.into()),
+            rel,
             link_type: Some(link_type.into()),
         }
     }

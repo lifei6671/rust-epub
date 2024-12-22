@@ -45,14 +45,6 @@ impl TocNav {
 
     fn encode_ncx_file(&mut self) -> Result<String, super::Error> {
         let mut ncx = TocNCX::new(self.title.clone(), self.lang.clone());
-
-        // self.metadata.iter().for_each(|(name, value)| {self.metadata.push((name.clone(), value.clone()));});
-        // for (_, (name, content)) in self.metadata.iter().enumerate() {
-        //     ncx.head.meta.push(MetaItem {
-        //         name: String::from(name),
-        //         content: String::from(content),
-        //     });
-        // }
         self.metadata.
             iter().
             enumerate().
@@ -81,12 +73,6 @@ impl TocNav {
 
     fn encode_nav_file(&mut self) -> Result<String, super::Error> {
         let mut html = Html::new(self.title.clone());
-        // for (_, (name, content)) in self.metadata.iter().enumerate() {
-        //     html.head.meta.push(MetaItem {
-        //         name: String::from(name),
-        //         content: String::from(content),
-        //     });
-        // }
          self.metadata.
              iter().
              enumerate().

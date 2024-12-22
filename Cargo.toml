@@ -11,5 +11,6 @@ serde = { version = "1.0.216", features = ["derive"] }
 chrono = "0.4.39"
 mime = "0.3.17"
 serde_with = "3.11.0"
+dashmap = "6.1.0"
 [[example]]
 name = "toc"

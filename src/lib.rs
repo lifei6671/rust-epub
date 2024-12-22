@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use dashmap::DashMap;
 use std::path::{Path, PathBuf};
 
 pub mod epub;
@@ -33,10 +33,22 @@ pub enum Error {
 
     /// Path conversion error
     PathConversionErr(String),
+
     /// File not found error
     FileNotFoundErr(String),
 
+    /// parent filename already exists
+    ParentExistedErr(String),
+
+    /// Filename already exists error
+    FilenameExistedErr(String),
+
+    /// Media file error
+    MediaError(String),
 }
+
+/// 将多个目录名组合成一个路径字符串
+#[allow(dead_code)]
 fn combine_dirs(dir_names: &[&str]) -> String {
     let mut path = PathBuf::new();
     for dir_name in dir_names {
@@ -44,15 +56,17 @@ fn combine_dirs(dir_names: &[&str]) -> String {
     }
     path.to_str().unwrap().to_string()
 }
+
+/// 添加媒体文件
 fn add_media<S1: Into<String>, S2: Into<String>>(
     source: S1,
     internal_filename: Option<String>,
     media_file_format: String,
     media_folder_name: S2,
-    hashmap: &mut HashMap<String, String>,
+    hashmap: &DashMap<String, String>,
 ) -> Result<String, Error> {
     let source_str = source.into();
-    /// Check if file exists
+    // Check if file exists
     if !Path::new(&source_str).exists() {
         return Err(Error::FileNotFoundErr(format!(
             "File not found:{}",
@@ -65,7 +79,7 @@ fn add_media<S1: Into<String>, S2: Into<String>>(
     } else {
         let file_path = Path::new(&source_str);
         let basename = file_path.file_name().unwrap().to_str().unwrap();
-        /// 判断文件名是否过长或是否已被使用
+        // 判断文件名是否过长或是否已被使用
         if basename.len() > 255 || hashmap.contains_key(basename) {
             let ext = file_path
                 .extension()
@@ -76,13 +90,14 @@ fn add_media<S1: Into<String>, S2: Into<String>>(
             String::from(basename)
         }
     };
-
     if hashmap.contains_key(&filename) {
         return Err(Error::FilenameUsedErr(format!(
             "Filename already used:{}",
             &filename
         )));
     }
+
     hashmap.insert(filename.clone(), source_str);
+
     Ok(format!("../{}/{}", media_folder_name.into(), filename))
 }
