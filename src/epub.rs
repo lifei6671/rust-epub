@@ -1,24 +1,49 @@
 use crate::mime::first;
+use crate::toc::{TocElement, TocNav};
 use crate::xhtml::{XHtmlLinkItem, XHtmlRoot};
-use crate::Error;
+use crate::{write, Error};
 use dashmap::{DashMap, DashSet};
+use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 #[allow(dead_code)]
-const CSS_FOLDER_NAME: &str = "css";
+pub(crate) const CSS_FOLDER_NAME: &str = "css";
 #[allow(dead_code)]
-const FONT_FOLDER_NAME: &str = "fonts";
+pub(crate) const FONT_FOLDER_NAME: &str = "fonts";
 #[allow(dead_code)]
-const IMAGE_FOLDER_NAME: &str = "images";
+pub(crate) const IMAGE_FOLDER_NAME: &str = "images";
 #[allow(dead_code)]
-const VIDEO_FOLDER_NAME: &str = "videos";
+pub(crate) const VIDEO_FOLDER_NAME: &str = "videos";
 #[allow(dead_code)]
-const AUDIO_FOLDER_NAME: &str = "audios";
+pub(crate) const AUDIO_FOLDER_NAME: &str = "audios";
 
 #[allow(dead_code)]
-const COVER_CSS_CONTENT: &str = "\
+pub(crate) const XHTML_FOLDER_NAME: &str = "xhtml";
+
+#[allow(dead_code)]
+pub(crate) const CONTENT_FOLDER_NAME: &str = "EPUB";
+#[allow(dead_code)]
+pub(crate) const MEDIA_TYPE_CSS: &str = "text/css";
+#[allow(dead_code)]
+pub(crate) const MEDIA_TYPE_EPUB: &str = "application/epub+zip";
+#[allow(dead_code)]
+pub(crate) const MEDIA_TYPE_JPEG: &str = "image/jpeg";
+#[allow(dead_code)]
+pub(crate) const MEDIA_TYPE_NCX: &str = "application/x-dtbncx+xml";
+#[allow(dead_code)]
+pub(crate) const MEDIA_TYPE_XHTML: &str = "application/xhtml+xml";
+#[allow(dead_code)]
+pub(crate) const META_INF_FOLDER_NAME: &str = "META-INF";
+
+#[allow(dead_code)]
+pub(crate) const CONTAINER_FILENAME: &str = "container.xml";
+#[allow(dead_code)]
+pub(crate) const PKG_FILENAME: &str = "content.opf";
+
+#[allow(dead_code)]
+pub(crate) const COVER_CSS_CONTENT: &str = "\
 body {
   background-color: #FFFFFF;
   margin-bottom: 0px;
@@ -32,18 +57,26 @@ img {
   max-width: 100%;
 }";
 #[allow(dead_code)]
-const COVER_FILE_NAME: &str = "cover.xhtml";
+pub(crate) const COVER_FILE_NAME: &str = "cover.xhtml";
 #[allow(dead_code)]
-const COVER_CSS_FILE: &str = "cover.css";
+pub(crate) const COVER_CSS_FILE: &str = "cover.css";
 
 /// epub规范版本
-#[derive(Debug)]
+#[derive(Debug, Copy)]
 #[allow(dead_code)]
 pub enum EpubVersion {
     V20,
     V30,
 }
 
+impl Clone for EpubVersion {
+    fn clone(&self) -> Self {
+        match self {
+            EpubVersion::V20 => EpubVersion::V20,
+            EpubVersion::V30 => EpubVersion::V30,
+        }
+    }
+}
 /// An epub file structure instance
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -101,17 +134,20 @@ pub struct EpubBuilder {
 
     /// Internal file name collection
     filenames: DashSet<String>,
+
+    /// Epub version
+    version: EpubVersion,
 }
 
 impl Default for EpubBuilder {
     fn default() -> Self {
-        EpubBuilder::new(String::from(""))
+        EpubBuilder::new(String::from(""), EpubVersion::V20)
     }
 }
 
 impl EpubBuilder {
     #[allow(dead_code)]
-    pub fn new<S: Into<String>>(title: S) -> EpubBuilder {
+    pub fn new<S: Into<String>>(title: S, ver: EpubVersion) -> EpubBuilder {
         EpubBuilder {
             title: title.into(),
             creator: Vec::new(),
@@ -137,12 +173,13 @@ impl EpubBuilder {
             audios: DashMap::new(),
             sections: Vec::new(),
             filenames: DashSet::new(),
+            version: ver,
         }
     }
 
     /// Set the epub identifier
     pub fn set_id<S: Into<String>>(&mut self, id: S) -> &mut Self {
-        self.identifier = Some(id.clone());
+        self.identifier = Some(id.into());
         self
     }
     /// Set the epub format
@@ -204,7 +241,6 @@ impl EpubBuilder {
         self
     }
 
-
     /// Add a metadata key-value pair to the epub
     pub fn add_metadata<S: Into<String>>(&mut self, key: S, value: S) -> &mut Self {
         if self.metadata.is_none() {
@@ -263,7 +299,11 @@ impl EpubBuilder {
         )
     }
     /// Add a stylesheet file to the epub
-    pub fn add_stylesheet<S1: Into<String>>(&mut self, source: S1, internal_filename: Option<String>) -> Result<String, Error> {
+    pub fn add_stylesheet<S1: Into<String>>(
+        &mut self,
+        source: S1,
+        internal_filename: Option<String>,
+    ) -> Result<String, Error> {
         let stylesheet = &mut self.stylesheet;
         super::add_media(
             source.into(),
@@ -275,7 +315,11 @@ impl EpubBuilder {
     }
 
     /// Add a font file to the epub
-    pub fn add_font<S1: Into<String>>(&mut self, source: S1, internal_filename: Option<String>) -> Result<String, Error> {
+    pub fn add_font<S1: Into<String>>(
+        &mut self,
+        source: S1,
+        internal_filename: Option<String>,
+    ) -> Result<String, Error> {
         let fonts = &mut self.fonts;
         super::add_media(
             source.into(),
@@ -286,6 +330,7 @@ impl EpubBuilder {
         )
     }
 
+    /// Set the epub cover
     pub fn set_cover<S1: Into<String>>(
         &mut self,
         internal_image_path: S1,
@@ -295,11 +340,15 @@ impl EpubBuilder {
         let image_path = Path::new(&raw_image_path);
 
         if !image_path.exists() {
-            return Err(Error::FileNotFoundErr(format!("file not found:{}", raw_image_path.clone())));
+            return Err(Error::FileNotFoundErr(format!(
+                "file not found:{}",
+                raw_image_path.clone()
+            )));
         }
 
-        first(raw_image_path.clone())
-            .ok_or_else(|| Error::MediaError(format!("file mime err:{}", raw_image_path.clone())))?;
+        first(raw_image_path.clone()).ok_or_else(|| {
+            Error::MediaError(format!("file mime err:{}", raw_image_path.clone()))
+        })?;
 
         // 移除之前的封面
         self.remove_cover_resources()?;
@@ -307,13 +356,18 @@ impl EpubBuilder {
         // 添加封面图片到资源列表中
         let cover_image_filename = self.add_image(raw_image_path.clone(), None)?;
 
-
         let body = format!("<img src=\"{}\" alt=\"cover\"/>", cover_image_filename);
-        let cover_xhtml_filename = self.add_section(None, body, "封面", Some(String::from(COVER_FILE_NAME)), internal_css_path)?;
-
+        let cover_xhtml_filename = self.add_section(
+            body,
+            "封面",
+            Some(String::from(COVER_FILE_NAME)),
+            internal_css_path,
+        )?;
 
         // 添加新封面
-        let cover = self.cover.get_or_insert_with(|| Arc::new(Mutex::new(Cover::default())));
+        let cover = self
+            .cover
+            .get_or_insert_with(|| Arc::new(Mutex::new(Cover::default())));
         let mut cover = cover.lock().unwrap();
 
         // 设置封面文件名
@@ -327,12 +381,30 @@ impl EpubBuilder {
     }
 
     /// Add a section to the epub
-    pub fn add_section<S1: Into<String>, S2: Into<String>>(&mut self,
-                                                           parent_filename: Option<String>,
-                                                           body: S1,
-                                                           section_title: S2,
-                                                           internal_filename: Option<String>,
-                                                           internal_css_path: Option<String>) -> Result<String, Error> {
+    pub fn add_section<S1: Into<String>, S2: Into<String>>(
+        &mut self,
+        body: S1,
+        section_title: S2,
+        internal_filename: Option<String>,
+        internal_css_path: Option<String>,
+    ) -> Result<String, Error> {
+        self.add_sub_section(
+            None,
+            body,
+            section_title,
+            internal_filename,
+            internal_css_path,
+        )
+    }
+    /// Add a section to the epub
+    pub fn add_sub_section<S1: Into<String>, S2: Into<String>>(
+        &mut self,
+        parent_filename: Option<String>,
+        body: S1,
+        section_title: S2,
+        internal_filename: Option<String>,
+        internal_css_path: Option<String>,
+    ) -> Result<String, Error> {
         let mut base_filename = String::new();
         if let Some(mut filename) = internal_filename {
             let ext = Path::new(&filename)
@@ -343,7 +415,10 @@ impl EpubBuilder {
                 filename = format!("{}.xhtml", filename);
             }
             if self.filenames.contains(&filename) {
-                return Err(Error::FilenameExistedErr(format!("file already exists:{}", filename)));
+                return Err(Error::FilenameExistedErr(format!(
+                    "file already exists:{}",
+                    filename
+                )));
             }
             base_filename = filename.clone();
         };
@@ -360,19 +435,26 @@ impl EpubBuilder {
         if let Some(p_filename) = parent_filename {
             if !p_filename.is_empty() {
                 if !self.filenames.contains(&p_filename) {
-                    return Err(Error::ParentExistedErr(format!("Parent file already exists:{}", p_filename)));
+                    return Err(Error::ParentExistedErr(format!(
+                        "Parent file already exists:{}",
+                        p_filename
+                    )));
                 }
                 parent_current_filename = p_filename;
             }
         }
 
         let mut section = Section::new(base_filename.clone());
+        let title = section_title.into();
+        section.title = title.clone();
         section.xhtml.set_body(body.into());
-        section.xhtml.set_title(section_title.into());
+        section.xhtml.set_title(title.clone());
 
         if let Some(css_path) = internal_css_path {
             let base_css_path = self.add_stylesheet(css_path, None)?;
-            section.xhtml.add_link(XHtmlLinkItem::new(base_css_path, "text/css", None));
+            section
+                .xhtml
+                .add_link(XHtmlLinkItem::new(base_css_path, "text/css", None));
         }
         if !parent_current_filename.is_empty() {
             let mut target_section = None;
@@ -444,7 +526,92 @@ impl EpubBuilder {
         Ok(())
     }
 
-    pub fn output(&self, output_path: &Path) -> Result<(), Error> {
+    pub fn output(&mut self, output_path: &Path) -> Result<(), Error> {
+        println!("Output: {}", output_path.display());
+        self.create_folder(output_path)?;
+
+
+        let ret = self.encode_toc_xml()?;
+        self.write_file(output_path.join("toc.ncx").as_ref(), &ret)?;
+
+
+
+        Ok(())
+    }
+
+    fn write_sections(&mut self, root_path:&Path, item: &mut Section) -> Result<(), Error> {
+        let path = root_path.join(CONTENT_FOLDER_NAME).join(XHTML_FOLDER_NAME).join(&item.filename);
+        self.write_file(path.as_ref(), &item.xhtml.encode_xml()?)?;
+        for child in &mut item.childs {
+            self.write_sections(root_path,child)?
+        }
+        Ok(())
+    }
+
+    fn encode_toc_xml(&mut self) -> Result<String, Error> {
+        let lang = self.language.clone().unwrap_or(String::from("zh-CN"));
+
+        let mut toc = TocNav::new(self.title.clone(), lang);
+        toc.add_metadata("dtb:uid", self.identifier.clone().unwrap_or(String::new()));
+        toc.add_metadata("dtb:totalPageCount", "0");
+        toc.add_metadata("dtb:maxPageNumber", "0");
+
+        let mut depth = 0;
+        let index = 0;
+        self.sections
+            .iter()
+            .map(|item| Self::convert_section(item, index, 0, &mut depth))
+            .for_each(|element| {
+                toc.add_element(element);
+            });
+
+        toc.add_metadata("dtb:depth", format!("{}", depth + 1));
+        let toc_xml = toc.encode_file(self.version);
+
+        toc_xml
+    }
+
+    /// 递归将 Section 转换为 TocElement
+    fn convert_section(section: &Section, index: i32, depth: usize, max_depth: &mut usize)
+        -> TocElement {
+        if depth > *max_depth {
+            *max_depth = depth;
+        }
+        TocElement {
+            level: index,
+            url: format!("{}/{}", XHTML_FOLDER_NAME, section.filename.clone()),
+            title: section.title.clone(),
+            childs: section
+                .childs
+                .iter()
+                .map(|item| Self::convert_section(item, index + 1, depth + 1, max_depth)) // 递归转换子节点
+                .collect(),
+        }
+    }
+
+    /// 创建文件夹
+    fn create_folder(&mut self,output_path: &Path) -> Result<(), Error> {
+        let folder_path = Path::new(output_path);
+        write::create_epub_folders(folder_path)?;
+        write::create_media_folder(folder_path,CSS_FOLDER_NAME,&mut self.stylesheet)?;
+        write::create_media_folder(folder_path,IMAGE_FOLDER_NAME,&mut self.images)?;
+        write::create_media_folder(folder_path,FONT_FOLDER_NAME,&mut self.fonts)?;
+        write::create_media_folder(folder_path,VIDEO_FOLDER_NAME,&mut self.videos)?;
+        write::create_media_folder(folder_path,AUDIO_FOLDER_NAME,&mut self.audios)?;
+
+        if !self.filenames.is_empty() {
+            let media_folder_path = folder_path.join(CONTENT_FOLDER_NAME).join(XHTML_FOLDER_NAME);
+            if let Err(e) = fs::create_dir_all(&media_folder_path) {
+                return Err(Error::PathCreateErr(format!("Could not create media folder:{}", e)));
+            }
+        }
+        Ok(())
+    }
+    /// 写入文件
+    fn write_file(&mut self, output_path: &Path,content:&str) -> Result<(), Error> {
+        if let Err(e) = fs::write(output_path, content) {
+           return  Err(Error::PathCreateErr(format!("Could not create file:{}", e)))
+        }
         Ok(())
     }
 }
@@ -485,6 +652,7 @@ impl Cover {
 #[allow(dead_code)]
 struct Section {
     filename: String,
+    title: String,
     xhtml: XHtmlRoot,
     childs: Vec<Section>,
 }
@@ -492,7 +660,8 @@ struct Section {
 impl Default for Section {
     fn default() -> Section {
         Section {
-            filename: "".to_string(),
+            filename: String::new(),
+            title: String::new(),
             xhtml: XHtmlRoot::default(),
             childs: Vec::new(),
         }
@@ -503,6 +672,7 @@ impl Section {
     pub fn new<S: Into<String>>(filename: S) -> Section {
         Section {
             filename: filename.into(),
+            title: String::new(),
             xhtml: XHtmlRoot::default(),
             childs: Vec::new(),
         }

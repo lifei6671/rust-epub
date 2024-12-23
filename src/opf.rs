@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::epub::EpubVersion;
+use serde::{Deserialize, Serialize};
 
 /// A struct representing an EPUB Package Document.
 
@@ -54,15 +54,11 @@ impl Package {
         self
     }
 
-    pub fn encode_xml(&self,ver : EpubVersion) -> Result<String, super::Error> {
-        let mut xml : PackageOpf;
+    pub fn encode_xml(&self, ver: EpubVersion) -> Result<String, super::Error> {
+        let mut xml: PackageOpf;
         match ver {
-            EpubVersion::V20 => {
-                xml = self.encode_v2_xml()
-            },
-            EpubVersion::V30 => {
-                xml = self.encode_v3_xml()
-            },
+            EpubVersion::V20 => xml = self.encode_v2_xml(),
+            EpubVersion::V30 => xml = self.encode_v3_xml(),
         }
         self.convert_metadata(&mut xml);
         self.convert_manifest(&mut xml);
@@ -72,18 +68,28 @@ impl Package {
         let ret = quick_xml::se::to_string(&xml);
 
         match ret {
-            Ok(s) => Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>{}",s)),
+            Ok(s) => Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>{}", s)),
             Err(e) => Err(super::Error::NonEncodable(e.to_string())),
         }
     }
 
     fn encode_v2_xml(&self) -> PackageOpf {
-        let creator = self.metadata.creator.first().unwrap_or(&"".to_string()).clone();
+        let creator = self
+            .metadata
+            .creator
+            .first()
+            .unwrap_or(&"".to_string())
+            .clone();
         let xml = PackageOpf::new(EpubVersion::V20, self.metadata.title.clone(), creator);
         xml
     }
     fn encode_v3_xml(&self) -> PackageOpf {
-        let creator = self.metadata.creator.first().unwrap_or(&"".to_string()).clone();
+        let creator = self
+            .metadata
+            .creator
+            .first()
+            .unwrap_or(&"".to_string())
+            .clone();
         let mut xml = PackageOpf::new(EpubVersion::V30, self.metadata.title.clone(), creator);
         self.convert_binding(&mut xml);
         xml
@@ -94,10 +100,13 @@ impl Package {
         xml.metadata.creator = self.metadata.creator.join(",");
         xml.metadata.subject = Some(self.metadata.subject.join(","));
         xml.metadata.description = self.metadata.description.clone();
-        xml.metadata.date = self.metadata.date_published.map(|d| d.format("%Y-%m-%dT%H:%M:%S %z").to_string());
+        xml.metadata.date = self
+            .metadata
+            .date_published
+            .map(|d| d.format("%Y-%m-%dT%H:%M:%S %z").to_string());
         if let Some(ref date) = self.metadata.date_modified {
-            xml.metadata.meta.push(MetaItemOpf{
-                name:None,
+            xml.metadata.meta.push(MetaItemOpf {
+                name: None,
                 text: date.format("%Y-%m-%dT%H:%M:%S %z").to_string(),
                 property: Some(String::from("dcterms:modified")),
             });
@@ -113,67 +122,68 @@ impl Package {
         xml.metadata.coverage = self.metadata.coverage.clone();
 
         self.metadata.meta.iter().for_each(|m| {
-            xml.metadata.meta.push(MetaItemOpf{
+            xml.metadata.meta.push(MetaItemOpf {
                 name: Some(m.name.clone()),
                 text: m.data.clone(),
                 property: Some(m.property.clone()),
             });
         });
-        xml.metadata.meta.push(MetaItemOpf{
+        xml.metadata.meta.push(MetaItemOpf {
             name: Some(String::from("generator")),
             text: self.metadata.generator.clone(),
             property: None,
         });
-        xml.metadata.meta.push(MetaItemOpf{
-            name : Some(String::from("generator-name")),
+        xml.metadata.meta.push(MetaItemOpf {
+            name: Some(String::from("generator-name")),
             text: self.metadata.generator_name.clone(),
-        property: None,
+            property: None,
         });
 
         xml
     }
 
     fn convert_manifest<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
-        self.manifest
-            .iter()
-            .for_each(|m| xml.manifest.items.push(ManifestItemOpf{
+        self.manifest.iter().for_each(|m| {
+            xml.manifest.items.push(ManifestItemOpf {
                 id: m.id.clone(),
                 href: m.href.clone(),
                 media_type: m.media_type.clone(),
-            }));
+            })
+        });
         xml
     }
 
     fn convert_spine<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
-        self.spine
-            .iter()
-            .for_each(|s| xml.spine.items.push(SpineItemRefOpf{
+        self.spine.iter().for_each(|s| {
+            xml.spine.items.push(SpineItemRefOpf {
                 idref: s.idref.clone(),
                 properties: None,
-            }));
+            })
+        });
         xml
     }
 
     fn convert_guide<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
-        self.guide
-            .iter()
-            .for_each(|g| xml.guide.items.push(GuideReferenceItemOpf{
+        self.guide.iter().for_each(|g| {
+            xml.guide.items.push(GuideReferenceItemOpf {
                 ref_type: g.ref_type.clone(),
                 href: g.href.clone(),
                 title: g.title.clone(),
-            }));
+            })
+        });
         xml
     }
 
     fn convert_binding<'a>(&self, xml: &'a mut PackageOpf) -> &'a mut PackageOpf {
         // 如果 xml.binding 为 None，则初始化它
-        xml.binding.get_or_insert_with(|| BindingOpf {
-            items: Vec::new(),
-        });
+        xml.binding
+            .get_or_insert_with(|| BindingOpf { items: Vec::new() });
         // 遍历 self.bindings 并添加到 xml.binding.items 中
         if let Some(binding) = &mut xml.binding {
             self.bindings.iter().for_each(|b| {
-                binding.items.push(BindingItemOpf::new(b.media_type.clone(), b.href.clone()));
+                binding
+                    .items
+                    .push(BindingItemOpf::new(b.media_type.clone(), b.href.clone()));
             });
         }
         xml
@@ -312,12 +322,18 @@ impl Metadata {
         self
     }
     /// set published date
-    pub fn set_date_published<D: Into<chrono::DateTime<chrono::Utc>>>(&mut self, date_published: D) -> &mut Self {
+    pub fn set_date_published<D: Into<chrono::DateTime<chrono::Utc>>>(
+        &mut self,
+        date_published: D,
+    ) -> &mut Self {
         self.date_published = Some(date_published.into());
         self
     }
     /// set modified date
-    pub fn set_date_modified<D: Into<chrono::DateTime<chrono::Utc>>>(&mut self, date_modified: D) -> &mut Self {
+    pub fn set_date_modified<D: Into<chrono::DateTime<chrono::Utc>>>(
+        &mut self,
+        date_modified: D,
+    ) -> &mut Self {
         self.date_modified = Some(date_modified.into());
         self
     }
@@ -352,7 +368,7 @@ impl Default for MetaItem {
 /// epub meta item
 impl MetaItem {
     /// Create a new meta item
-    pub fn new<S: Into<String>>(content:S) -> MetaItem {
+    pub fn new<S: Into<String>>(content: S) -> MetaItem {
         MetaItem {
             refines: String::new(),
             property: String::new(),
@@ -369,7 +385,7 @@ impl MetaItem {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Manifest {
-    items : Vec<ManifestItem>,
+    items: Vec<ManifestItem>,
 }
 /// 资源列表
 #[derive(Debug)]
@@ -396,7 +412,7 @@ impl Default for ManifestItem {
 /// epub manifest item
 impl ManifestItem {
     /// Create a new manifest item
-    pub fn new<S: Into<String>>(id: S, href: S, media_type :S) -> ManifestItem {
+    pub fn new<S: Into<String>>(id: S, href: S, media_type: S) -> ManifestItem {
         ManifestItem {
             id: id.into(),
             href: href.into(),
@@ -427,14 +443,20 @@ pub struct SpineItemRef {
 impl Default for SpineItemRef {
     /// Create a new spine item ref
     fn default() -> Self {
-        SpineItemRef { idref: String::new(), properties: None }
+        SpineItemRef {
+            idref: String::new(),
+            properties: None,
+        }
     }
 }
 /// epub spine item ref
 impl SpineItemRef {
     /// Create a new spine item ref
     pub fn new<S: Into<String>>(idref: S) -> SpineItemRef {
-        SpineItemRef { idref: idref.into(), properties: None }
+        SpineItemRef {
+            idref: idref.into(),
+            properties: None,
+        }
     }
 }
 
@@ -474,7 +496,7 @@ impl GuideReference {
     }
 }
 
-#[derive(Debug,)]
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct BindingItem {
     media_type: String,
@@ -505,32 +527,44 @@ struct PackageOpf {
     guide: GuideReferenceOpf,
 
     #[serde(rename = "bindings", skip_serializing_if = "Option::is_none")]
-    binding :Option<BindingOpf>,
+    binding: Option<BindingOpf>,
 
     #[serde(rename = "@version")]
-    version : String,
-    #[serde(rename = "@xmlns:opf",skip_serializing_if = "String::is_empty")]
+    version: String,
+    #[serde(rename = "@xmlns:opf", skip_serializing_if = "String::is_empty")]
     xmlns_opf: String,
-    #[serde(rename = "@xmlns:dc",skip_serializing_if = "String::is_empty")]
+    #[serde(rename = "@xmlns:dc", skip_serializing_if = "String::is_empty")]
     xmlns_dc: String,
-    #[serde(rename = "@xmlns:xsi" ,skip_serializing_if = "String::is_empty")]
+    #[serde(rename = "@xmlns:xsi", skip_serializing_if = "String::is_empty")]
     xmlns_xsi: String,
 }
 
 impl PackageOpf {
-    fn new<S:Into<String>>(ver : EpubVersion, title:S, creator: S) -> PackageOpf {
+    fn new<S: Into<String>>(ver: EpubVersion, title: S, creator: S) -> PackageOpf {
         //            xmlns_opf: "http://www.idpf.org/2007/opf".to_string(),
         //             xmlns_dc: "http://purl.org/dc/elements/1.1/".to_string(),
         //             xmlns_xsi: "http://www.w3.org/2001/XMLSchema-instance".to_string(),
-        let xmlns_opf = match ver { EpubVersion::V20=>"http://www.idpf.org/2007/opf".to_string(),EpubVersion::V30=>"http://www.idpf.org/2007/opf".to_string() ,};
-        let xmlns_dc = match ver { EpubVersion::V20=>"".to_string(),EpubVersion::V30=>"http://purl.org/dc/elements/1.1/".to_string() ,};
-        let xmlns_xsi = match ver { EpubVersion::V20=>"".to_string(),EpubVersion::V30=>"http://www.w3.org/2001/XMLSchema-instance".to_string() ,};
+        let xmlns_opf = match ver {
+            EpubVersion::V20 => "http://www.idpf.org/2007/opf".to_string(),
+            EpubVersion::V30 => "http://www.idpf.org/2007/opf".to_string(),
+        };
+        let xmlns_dc = match ver {
+            EpubVersion::V20 => "".to_string(),
+            EpubVersion::V30 => "http://purl.org/dc/elements/1.1/".to_string(),
+        };
+        let xmlns_xsi = match ver {
+            EpubVersion::V20 => "".to_string(),
+            EpubVersion::V30 => "http://www.w3.org/2001/XMLSchema-instance".to_string(),
+        };
         PackageOpf {
-            metadata: MetadataOpf::new(title,creator),
+            metadata: MetadataOpf::new(title, creator),
             manifest: ManifestOpf::default(),
             spine: SpineOpf::default(),
             guide: GuideReferenceOpf::default(),
-            version:  match ver { EpubVersion::V20=> String::from("v2.0"),EpubVersion::V30=>String::from("v3.0") ,},
+            version: match ver {
+                EpubVersion::V20 => String::from("v2.0"),
+                EpubVersion::V30 => String::from("v3.0"),
+            },
             binding: Some(BindingOpf::default()),
             xmlns_opf,
             xmlns_dc,
@@ -539,19 +573,18 @@ impl PackageOpf {
     }
 }
 
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename = "metadata")]
 struct MetadataOpf {
-    #[serde(rename = "dc:creator",skip_serializing_if = "String::is_empty")]
+    #[serde(rename = "dc:creator", skip_serializing_if = "String::is_empty")]
     creator: String,
     #[serde(rename = "dc:title")]
     title: String,
-    #[serde(rename = "dc:subject",skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "dc:subject", skip_serializing_if = "Option::is_none")]
     subject: Option<String>,
-    #[serde(rename = "dc:description",skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "dc:description", skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    #[serde(rename = "dc:date",skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "dc:date", skip_serializing_if = "Option::is_none")]
     date: Option<String>,
     #[serde(rename = "dc:type", skip_serializing_if = "Option::is_none")]
     category: Option<String>,
@@ -561,7 +594,10 @@ struct MetadataOpf {
     contributor: Option<String>,
     #[serde(rename = "dc:format", skip_serializing_if = "Option::is_none")]
     format: Option<String>,
-    #[serde(rename = "dc:identifier", skip_serializing_if = "skip_if_empty_identifier")]
+    #[serde(
+        rename = "dc:identifier",
+        skip_serializing_if = "skip_if_empty_identifier"
+    )]
     identifier: Option<IdentifierOpf>,
     #[serde(rename = "dc:source", skip_serializing_if = "Option::is_none")]
     source: Option<String>,
@@ -576,14 +612,12 @@ struct MetadataOpf {
     #[serde(rename = "dc:cover", skip_serializing_if = "Option::is_none")]
     cover: Option<String>,
 
-
     #[serde(rename = "meta", skip_serializing_if = "Vec::is_empty")]
     meta: Vec<MetaItemOpf>,
 }
 
-
 impl MetadataOpf {
-    fn new<S:Into<String>>(title: S, creator: S) -> MetadataOpf {
+    fn new<S: Into<String>>(title: S, creator: S) -> MetadataOpf {
         MetadataOpf {
             creator: creator.into(),
             title: title.into(),
@@ -612,7 +646,7 @@ struct MetaItemOpf {
     text: String,
     #[serde(rename = "@name", skip_serializing_if = "Option::is_none")]
     name: Option<String>,
-    #[serde(rename = "@property",skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "@property", skip_serializing_if = "Option::is_none")]
     property: Option<String>,
 }
 
@@ -643,7 +677,7 @@ struct ManifestOpf {
     items: Vec<ManifestItemOpf>,
 }
 
-impl Default for  ManifestOpf {
+impl Default for ManifestOpf {
     fn default() -> Self {
         ManifestOpf { items: Vec::new() }
     }
@@ -660,7 +694,7 @@ struct ManifestItemOpf {
     media_type: String,
 }
 
-#[derive(Debug,  Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "spine")]
 struct SpineOpf {
     #[serde(rename = "@toc")]
@@ -678,7 +712,7 @@ impl Default for SpineOpf {
     }
 }
 
-#[derive(Debug,  Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "spine")]
 struct SpineItemRefOpf {
     #[serde(rename = "@idref")]
@@ -700,7 +734,7 @@ impl Default for GuideReferenceOpf {
     }
 }
 
-#[derive(Debug,  Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "reference ")]
 struct GuideReferenceItemOpf {
     #[serde(rename = "@type")]
@@ -715,7 +749,7 @@ struct GuideReferenceItemOpf {
 #[serde(rename = "bindings ")]
 struct BindingOpf {
     #[serde(rename = "binding", skip_serializing_if = "Vec::is_empty")]
-    items : Vec<BindingItemOpf>,
+    items: Vec<BindingItemOpf>,
 }
 
 impl Default for BindingOpf {
@@ -727,14 +761,14 @@ impl Default for BindingOpf {
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct BindingItemOpf {
-    #[serde(rename = "@media-type",skip_serializing_if = "String::is_empty")]
-    media_type:String,
-    #[serde(rename = "@href",skip_serializing_if = "String::is_empty")]
-    href:String,
+    #[serde(rename = "@media-type", skip_serializing_if = "String::is_empty")]
+    media_type: String,
+    #[serde(rename = "@href", skip_serializing_if = "String::is_empty")]
+    href: String,
 }
 
 impl BindingItemOpf {
-    fn new<S:Into<String>>(media_type: S, href: S) -> BindingItemOpf {
+    fn new<S: Into<String>>(media_type: S, href: S) -> BindingItemOpf {
         BindingItemOpf {
             media_type: media_type.into(),
             href: href.into(),

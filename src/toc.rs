@@ -1,11 +1,12 @@
 use crate::epub::EpubVersion;
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default)]
 pub struct TocNav {
     title: String,
     lang: String,
-    metadata: Vec<(String, String)>,
+    metadata: DashMap<String, String>,
     elements: Vec<TocElement>,
 }
 
@@ -14,7 +15,7 @@ impl TocNav {
         TocNav {
             title: title.into(),
             lang: lang.into(),
-            metadata: Vec::new(),
+            metadata: DashMap::new(),
             elements: Vec::new(),
         }
     }
@@ -28,7 +29,7 @@ impl TocNav {
         name: S1,
         value: S2,
     ) -> &mut TocNav {
-        self.metadata.push((name.into(), value.into()));
+        self.metadata.insert(name.into(), value.into());
         self
     }
     pub fn add_element(&mut self, elem: TocElement) -> &mut TocNav {
@@ -45,60 +46,58 @@ impl TocNav {
 
     fn encode_ncx_file(&mut self) -> Result<String, super::Error> {
         let mut ncx = TocNCX::new(self.title.clone(), self.lang.clone());
-        self.metadata.
-            iter().
-            enumerate().
-            map(|(_, (name, value))| {
-            MetaItem {
-                name: String::from(name),
-                content: String::from(value),
-            }
-        }).for_each(|meta| {ncx.head.meta.push(meta);});
+        self.covert_meta_item(|meta| {
+            ncx.head.meta.push(meta);
+        });
 
         for el in self.elements.iter_mut() {
             ncx.nav_map.nav_point.push(NavPoint::from_toc_element(el));
         }
-        let ret = quick_xml::se::to_string(&ncx);
+        let ret = super::encode_xml(&ncx);
         match ret {
             Ok(s) => {
-                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-                    <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">{}",
-                    s
-                );
+                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">{}",
+                    s);
                 Ok(xml_str)
             }
-            Err(e) => Err(super::Error::NonEncodable(e.to_string())),
+            Err(e) => Err(e),
         }
     }
 
     fn encode_nav_file(&mut self) -> Result<String, super::Error> {
         let mut html = Html::new(self.title.clone());
-         self.metadata.
-             iter().
-             enumerate().
-             map(|(_, (name, value))| {
-             MetaItem {
-                 name: String::from(name),
-                 content: String::from(value),
-             }
-         }).for_each(|meta| {html.head.meta.push(meta);});
-
-             // for_each(|(name, value)| {self.metadata.push((String::from(name), String::from(value)));});
+        self.covert_meta_item(|meta| {
+            html.head.meta.push(meta);
+        });
 
         for el in self.elements.iter() {
             html.body.nav_toc.add_list(List::from_toc_element(el));
         }
-        let ret = quick_xml::se::to_string(&html);
+        let ret = super::encode_xml(&html);
         match ret {
             Ok(s) => {
-                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-                    <!DOCTYPE html>{}",
-                                      s
+                let xml_str = format!(
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html>{}",
+                    s
                 );
                 Ok(xml_str)
             }
-            Err(e) => Err(super::Error::NonEncodable(e.to_string())),
+            Err(e) => Err(e),
         }
+    }
+
+    fn covert_meta_item<F>(&self, mut callback: F)
+    where
+        F: FnMut(MetaItem),
+    {
+        self.metadata
+            .iter()
+            .enumerate()
+            .map(|(_, item)| MetaItem {
+                name: String::from(item.key()),
+                content: String::from(item.value()),
+            })
+            .for_each(|meta| callback(meta));
     }
 }
 
@@ -328,13 +327,13 @@ struct Html {
     #[serde(rename = "head")]
     head: Head,
     #[serde(rename = "body")]
-    body : Body,
+    body: Body,
 }
 
 impl Html {
-    pub fn new<S1 :Into<String>>(title : S1) -> Self {
+    pub fn new<S1: Into<String>>(title: S1) -> Self {
         let title_str = title.into();
-        Html{
+        Html {
             xmlns: "http://www.w3.org/1999/xhtml".to_string(),
             xmlns_epub: "http://www.idpf.org/2007/ops".to_string(),
             head: Head::new(title_str.clone()),
@@ -349,32 +348,32 @@ struct Head {
     #[serde(rename = "meta")]
     meta: Vec<MetaItem>,
     #[serde(rename = "title")]
-    title :String,
+    title: String,
 }
 
 impl Head {
-    fn new<S1 :Into<String>>(title : S1) -> Self {
-        Head{
+    fn new<S1: Into<String>>(title: S1) -> Self {
+        Head {
             meta: Vec::new(),
             title: title.into(),
         }
     }
 }
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename = "body")]
 struct Body {
     #[serde(rename = "nav")]
-    nav_toc: NavToc
+    nav_toc: NavToc,
 }
 
 impl Body {
-    fn new<S1 :Into<String>>(title : S1) -> Self {
-        Body{
+    fn new<S1: Into<String>>(title: S1) -> Self {
+        Body {
             nav_toc: NavToc::new(title.into()),
         }
     }
 }
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename = "nav")]
 struct NavToc {
     #[serde(rename = "@epub:type")]
@@ -388,11 +387,14 @@ struct NavToc {
 }
 
 impl NavToc {
-    fn new<S1 :Into<String>>(title : S1) -> Self {
-        NavToc{
+    fn new<S1: Into<String>>(title: S1) -> Self {
+        NavToc {
             epub_type: String::from("toc"),
-            id:String::from("toc"),
-            h1: H1{id:None, text: title.into() },
+            id: String::from("toc"),
+            h1: H1 {
+                id: None,
+                text: title.into(),
+            },
             order_list: Default::default(),
         }
     }
@@ -402,7 +404,7 @@ impl NavToc {
         self
     }
 }
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct H1 {
     #[serde(rename = "@id", skip_serializing_if = "Option::is_none")]
     id: Option<String>,
@@ -410,7 +412,7 @@ struct H1 {
     text: String,
 }
 
-#[derive(Debug,Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename = "ol")]
 struct OrderList {
     #[serde(rename = "li")]
@@ -419,8 +421,8 @@ struct OrderList {
 
 impl OrderList {
     fn from_toc_elements(elements: &[TocElement]) -> Self {
-        OrderList{
-            list: elements.iter().map(|e|List::from_toc_element(e)).collect(),
+        OrderList {
+            list: elements.iter().map(|e| List::from_toc_element(e)).collect(),
         }
     }
 }
@@ -429,15 +431,15 @@ impl OrderList {
 struct List {
     #[serde(rename = "a")]
     anchor: Anchor,
-    #[serde(rename = "ol",skip_serializing_if="Option::is_none")]
+    #[serde(rename = "ol", skip_serializing_if = "Option::is_none")]
     order_list: Option<OrderList>,
 }
 
 #[allow(dead_code)]
 impl List {
-    fn new<S1 :Into<String>,S2:Into<String>>(title : S1,href: S2) -> Self {
-        List{
-            anchor: Anchor{
+    fn new<S1: Into<String>, S2: Into<String>>(title: S1, href: S2) -> Self {
+        List {
+            anchor: Anchor {
                 href: href.into(),
                 text: title.into(),
             },
@@ -445,20 +447,19 @@ impl List {
         }
     }
 
-    fn from_toc_element(element: &TocElement) ->Self{
+    fn from_toc_element(element: &TocElement) -> Self {
         List {
-            anchor:Anchor{
-                href:element.url.clone(),
-                text:element.title.clone(),
+            anchor: Anchor {
+                href: element.url.clone(),
+                text: element.title.clone(),
             },
-            order_list : if element.childs.is_empty() {
+            order_list: if element.childs.is_empty() {
                 None
-            }   else {
+            } else {
                 Some(OrderList::from_toc_elements(&element.childs))
-            }
+            },
         }
     }
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

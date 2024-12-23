@@ -40,7 +40,6 @@ fn test_first_or_octet_stream() {
     assert_eq!(ext, "video/mp4");
 }
 
-
 #[test]
 fn test_first() {
     let mime_str = first("tests/resources/mimes.mp4");

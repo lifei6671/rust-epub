@@ -66,7 +66,7 @@ impl XHtmlRoot {
                 );
                 self.body.content = body;
                 Ok(xml_str)
-            },
+            }
             Err(e) => Err(super::Error::NonEncodable(e.to_string())),
         }
     }
@@ -117,7 +117,7 @@ impl Default for StyleContent {
 }
 
 impl StyleContent {
-    pub fn new<S1: Into<String>,S2:Into<String>>(value: S1,style_type :S2) -> Self {
+    pub fn new<S1: Into<String>, S2: Into<String>>(value: S1, style_type: S2) -> Self {
         StyleContent {
             style_type: Some(style_type.into()),
             value: Some(value.into()),
@@ -147,7 +147,8 @@ impl XHtmlHead {
     /// Adds a style content to the head.
     #[allow(dead_code)]
     pub fn add_style_content<S: Into<String>>(mut self, style: S) -> Self {
-        self.style_content.push(StyleContent::new(style, String::from("text/css")));
+        self.style_content
+            .push(StyleContent::new(style, String::from("text/css")));
         self
     }
     /// Adds a link to the head.
@@ -218,12 +219,20 @@ pub struct XHtmlLinkItem {
 
 impl Default for XHtmlLinkItem {
     fn default() -> Self {
-        XHtmlLinkItem::new(String::new(), String::new(), Some(String::from("stylesheet")))
+        XHtmlLinkItem::new(
+            String::new(),
+            String::new(),
+            Some(String::from("stylesheet")),
+        )
     }
 }
 
 impl XHtmlLinkItem {
-    pub fn new<S1: Into<String>, S2: Into<String>>(href: S1, link_type: S2, rel: Option<String>) -> Self {
+    pub fn new<S1: Into<String>, S2: Into<String>>(
+        href: S1,
+        link_type: S2,
+        rel: Option<String>,
+    ) -> Self {
         XHtmlLinkItem {
             href: href.into(),
             rel,
@@ -232,8 +241,8 @@ impl XHtmlLinkItem {
     }
 }
 
-#[derive(Debug, Serialize,Deserialize)]
-struct XHtmlBody{
+#[derive(Debug, Serialize, Deserialize)]
+struct XHtmlBody {
     #[serde(rename = "$text")]
     content: String,
     #[serde(rename = "@dir", skip_serializing_if = "Option::is_none")]
@@ -245,15 +254,14 @@ impl Default for XHtmlBody {
         XHtmlBody::new(String::new())
     }
 }
-impl XHtmlBody{
-    pub fn new<S: Into<String>>(content : S) -> Self {
+impl XHtmlBody {
+    pub fn new<S: Into<String>>(content: S) -> Self {
         XHtmlBody {
             content: content.into(),
             dir: Some(String::from("auto")),
         }
     }
 }
-
 
 // 自定义函数：判断 Option<String> 是否应跳过序列化
 fn is_none_or_empty(value: &Option<String>) -> bool {

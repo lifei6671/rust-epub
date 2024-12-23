@@ -1,12 +1,14 @@
 use dashmap::DashMap;
+use quick_xml::se::Serializer;
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 pub mod epub;
-pub mod toc;
-pub mod opf;
 pub mod mime;
+pub mod opf;
+pub mod toc;
+mod write;
 pub mod xhtml;
-mod raw_xml;
 
 /// 错误信息枚举
 #[derive(Debug)]
@@ -14,11 +16,11 @@ pub enum Error {
     /// Returned when the provided metadata is not a supported value for epub files.
     InvalidMetadataErr(String),
     /// Returned when an IO exception occurs in the file system.
-    IOError{
+    IOError {
         /// IO错误信息
-        msg :String,
+        msg: String,
         /// IO错误的上下文信息
-        cause : std::io::Error,
+        cause: std::io::Error,
     },
     /// This error may be that the path is unreadable, does not exist, or has abnormal path permissions.
     PathError(String),
@@ -37,6 +39,9 @@ pub enum Error {
     /// File not found error
     FileNotFoundErr(String),
 
+    /// Path creation error
+    PathCreateErr(String),
+
     /// parent filename already exists
     ParentExistedErr(String),
 
@@ -45,6 +50,18 @@ pub enum Error {
 
     /// Media file error
     MediaError(String),
+
+    /// Serialize error
+    SerializeErr(String),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IOError {
+            msg: format!("{}", e),
+            cause: e,
+        }
+    }
 }
 
 /// 将多个目录名组合成一个路径字符串
@@ -100,4 +117,21 @@ fn add_media<S1: Into<String>, S2: Into<String>>(
     hashmap.insert(filename.clone(), source_str);
 
     Ok(format!("../{}/{}", media_folder_name.into(), filename))
+}
+
+/// Serialize struct into a String.
+pub fn encode_xml<T>(value: &T) -> Result<String, Error>
+where
+    T: ?Sized + Serialize,
+{
+    let mut buffer = String::new();
+    let mut serializer = Serializer::new(&mut buffer);
+    serializer.indent(' ', 2);
+
+    value
+        .serialize(serializer)
+        .map_err(|e| Error::SerializeErr(format!("{}", e)))?;
+
+    // 转换缓冲区内容为字符串
+    String::from_utf8(buffer.into_bytes()).map_err(|e| Error::SerializeErr(e.to_string()))
 }

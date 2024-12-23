@@ -5,7 +5,7 @@ use rust_epub::opf::{BindingItem, GuideReference, ManifestItem, Metadata, SpineI
 #[test]
 fn test_encode_v2_xml() {
     let mut opf = rust_epub::opf::Package::new();
-    let mut metadata  = Metadata::default();
+    let mut metadata = Metadata::default();
     metadata.title = String::from("北宋小厨师");
     metadata.set_date_published(chrono::Utc::now());
     metadata.set_category("历史穿越");
@@ -14,30 +14,29 @@ fn test_encode_v2_xml() {
     metadata.set_publisher("掌上书苑");
     metadata.set_format("application/epub+zip");
 
-
     opf.set_metadata(metadata);
 
-    let mut manifest = ManifestItem::new("stylesheet","styles.css","text/css");
+    let mut manifest = ManifestItem::new("stylesheet", "styles.css", "text/css");
     manifest.id = String::from("content");
     manifest.href = String::from("text.xhtml");
     manifest.media_type = String::from("application/xhtml+xml");
 
-
-    opf.add_manifest(manifest).
-        add_manifest( ManifestItem::new("stylesheet","styles.css","text/css"));
+    opf.add_manifest(manifest).add_manifest(ManifestItem::new(
+        "stylesheet",
+        "styles.css",
+        "text/css",
+    ));
 
     opf.add_spine(SpineItemRef::new("cover.xhtml"));
     opf.add_spine(SpineItemRef::new("text.xhtml"));
     opf.add_spine(SpineItemRef::new("cover.xhtml"));
 
-    opf.add_guide(GuideReference::new("Cover","cover","cover.xhtml", ));
+    opf.add_guide(GuideReference::new("Cover", "cover", "cover.xhtml"));
 
-
-    opf.add_binding(BindingItem::new("application/x-dtbncx+xml","toc.ncx"));
+    opf.add_binding(BindingItem::new("application/x-dtbncx+xml", "toc.ncx"));
 
     let ret = opf.encode_xml(EpubVersion::V20);
     println!("{}", ret.unwrap_or_default());
-
 }
 
 #[test]
@@ -52,21 +51,22 @@ fn test_encode_v3_xml() {
     metadata.set_publisher("掌上书苑");
     metadata.set_format("application/epub+zip");
 
-
     opf.set_metadata(metadata);
 
     let mut manifest = ManifestItem::new("stylesheet", "styles.css", "text/css");
     manifest.id = String::from("content");
     manifest.href = String::from("text.xhtml");
-    manifest.media_type = String::from("
-        application/xhtml+xml");
-    opf.add_manifest(manifest).
-        add_spine(SpineItemRef::new("cover.xhtml"));
+    manifest.media_type = String::from(
+        "
+        application/xhtml+xml",
+    );
+    opf.add_manifest(manifest)
+        .add_spine(SpineItemRef::new("cover.xhtml"));
     opf.add_spine(SpineItemRef::new("text.xhtml"));
     opf.add_spine(SpineItemRef::new("cover.xhtml"));
     opf.add_guide(GuideReference::new("Cover", "cover", "cover.xhtml"));
 
-    opf.add_binding(BindingItem::new("application/x-dtbncx+xml","toc.ncx"));
+    opf.add_binding(BindingItem::new("application/x-dtbncx+xml", "toc.ncx"));
 
     let ret = opf.encode_xml(EpubVersion::V30);
     println!("{}", ret.unwrap_or_default());
