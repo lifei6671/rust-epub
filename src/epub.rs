@@ -609,6 +609,9 @@ impl EpubBuilder {
         }
         Ok(())
     }
+    fn write_cover(&mut self, cover_path: &Path) -> Result<(), Error> {
+        Ok(())
+    }
 
     /// 递归将 Section 转换为 TocElement
     fn convert_section(section: &Section, index: i32, depth: usize, max_depth: &mut usize)
