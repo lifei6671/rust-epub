@@ -2,7 +2,6 @@ use rand::{thread_rng, Rng};
 use rust_epub::epub::{EpubBuilder, EpubVersion};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
 
 #[test]
 fn test_add_image() {
@@ -122,7 +121,7 @@ fn test_set_cover() {
 #[test]
 fn test_encode_toc_xml() {
     let mut epub = EpubBuilder::new("大语言模型：辩论", EpubVersion::V20);
-    let temp_dir: PathBuf = env::temp_dir();
+    // let temp_dir: PathBuf = env::temp_dir();
     let mut rng = thread_rng();
     let random_dir_name: String = (0..8)
         .map(|_| {
@@ -135,7 +134,10 @@ fn test_encode_toc_xml() {
             }
         })
         .collect();
-    let random_dir_path = temp_dir.join(random_dir_name);
+    let random_dir_path = env::current_dir()
+        .unwrap()
+        .join("tests")
+        .join(random_dir_name);
 
     let e = fs::create_dir_all(&random_dir_path);
     assert!(e.is_ok());

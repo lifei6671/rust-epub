@@ -56,7 +56,7 @@ impl TocNav {
         let ret = super::encode_xml(&ncx);
         match ret {
             Ok(s) => {
-                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">{}",
+                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n{}",
                     s);
                 Ok(xml_str)
             }

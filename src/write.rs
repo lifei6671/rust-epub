@@ -26,3 +26,11 @@ pub(crate) fn create_media_folder(root_dir: &Path,media_folder_name:&str,hashmap
     }
     Ok(())
 }
+
+/// write file
+pub(crate) fn write_file(output_path: &Path,content:&str) -> Result<(), Error> {
+    if let Err(e) = fs::write(output_path, content) {
+        return  Err(Error::PathCreateErr(format!("Could not create file:{}", e)))
+    }
+    Ok(())
+}

@@ -1,8 +1,10 @@
+use crate::epub::EpubVersion::{V20, V30};
 use crate::mime::first;
 use crate::toc::{TocElement, TocNav};
 use crate::xhtml::{XHtmlLinkItem, XHtmlRoot};
 use crate::{write, Error};
 use dashmap::{DashMap, DashSet};
+use std::cmp::PartialEq;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -62,7 +64,7 @@ pub(crate) const COVER_FILE_NAME: &str = "cover.xhtml";
 pub(crate) const COVER_CSS_FILE: &str = "cover.css";
 
 /// epub规范版本
-#[derive(Debug, Copy)]
+#[derive(Debug, PartialEq,Copy)]
 #[allow(dead_code)]
 pub enum EpubVersion {
     V20,
@@ -144,6 +146,8 @@ impl Default for EpubBuilder {
         EpubBuilder::new(String::from(""), EpubVersion::V20)
     }
 }
+
+
 
 impl EpubBuilder {
     #[allow(dead_code)]
@@ -530,45 +534,73 @@ impl EpubBuilder {
         println!("Output: {}", output_path.display());
         self.create_folder(output_path)?;
 
-
-        let ret = self.encode_toc_xml()?;
-        self.write_file(output_path.join("toc.ncx").as_ref(), &ret)?;
-
-
-
-        Ok(())
-    }
-
-    fn write_sections(&mut self, root_path:&Path, item: &mut Section) -> Result<(), Error> {
-        let path = root_path.join(CONTENT_FOLDER_NAME).join(XHTML_FOLDER_NAME).join(&item.filename);
-        self.write_file(path.as_ref(), &item.xhtml.encode_xml()?)?;
-        for child in &mut item.childs {
-            self.write_sections(root_path,child)?
+        if let Err(e) = self.encode_toc_xml(output_path) {
+            return Err(e);
         }
-        Ok(())
+        let xhtml_path=output_path.join(CONTENT_FOLDER_NAME).join(XHTML_FOLDER_NAME);
+        if let Err(e) =  self.write_all_sections(xhtml_path.as_ref()) {
+            return Err(e);
+        }
+
+         Ok(())
     }
 
-    fn encode_toc_xml(&mut self) -> Result<String, Error> {
-        let lang = self.language.clone().unwrap_or(String::from("zh-CN"));
+
+    fn write_all_sections(&mut self, output_path: &Path) -> Result<(), Error> {
+        let mut sections = std::mem::take(&mut self.sections); // 临时取出 sections
+        for mut section in sections.iter_mut() {
+            self.write_sections(output_path, &mut section)?;
+        }
+        self.sections = sections; // 将 sections 放回 self
+        Ok(())
+    }
+    fn write_sections(&mut self, root_path: &Path, item: &mut Section) -> Result<(), Error> {
+        let mut stack = vec![item];
+
+        while let Some(current_item) = stack.pop() {
+            let path = root_path.join(&current_item.filename);
+            println!("Writing: {}", path.display());
+            write::write_file(path.as_ref(), &current_item.xhtml.encode_xml()?)?;
+
+            // 将子节点加入栈中，逆序以保持顺序一致
+            stack.extend(current_item.childs.iter_mut().rev());
+        }
+
+        Ok(())
+    }
+    fn encode_toc_xml(&mut self,toc_path:&Path) -> Result<(), Error> {
+        let lang = self.language.as_deref().unwrap_or("zh-CN");
 
         let mut toc = TocNav::new(self.title.clone(), lang);
-        toc.add_metadata("dtb:uid", self.identifier.clone().unwrap_or(String::new()));
+        toc.add_metadata("dtb:uid", self.identifier.as_deref().unwrap_or_default());
         toc.add_metadata("dtb:totalPageCount", "0");
         toc.add_metadata("dtb:maxPageNumber", "0");
 
         let mut depth = 0;
-        let index = 0;
         self.sections
-            .iter()
-            .map(|item| Self::convert_section(item, index, 0, &mut depth))
-            .for_each(|element| {
+            .iter().
+            enumerate()
+            // .map(|item| Self::convert_section(item, index, 0, &mut depth))
+            .for_each(|(index,item)| {
+                let element = Self::convert_section(item, index as i32, 0, &mut depth);
                 toc.add_element(element);
             });
 
-        toc.add_metadata("dtb:depth", format!("{}", depth + 1));
-        let toc_xml = toc.encode_file(self.version);
+        toc.add_metadata("dtb:depth", (depth + 1).to_string());
 
-        toc_xml
+        let write_toc_file = |toc: &mut TocNav, ver :EpubVersion| -> Result<(), Error> {
+            let toc_path = match ver { V20 => toc_path.join("toc.ncx"), V30 => toc_path.join("nav.xhtml")  };
+            if let Ok(toc_xml) = toc.encode_file(ver){
+                return write::write_file(toc_path.as_ref(), &toc_xml);
+            }
+            Ok(())
+        };
+        write_toc_file(&mut toc, V20)?;
+
+        if self.version == V30 {
+            write_toc_file(&mut toc, V30)?;
+        }
+        Ok(())
     }
 
     /// 递归将 Section 转换为 TocElement
@@ -604,13 +636,6 @@ impl EpubBuilder {
             if let Err(e) = fs::create_dir_all(&media_folder_path) {
                 return Err(Error::PathCreateErr(format!("Could not create media folder:{}", e)));
             }
-        }
-        Ok(())
-    }
-    /// 写入文件
-    fn write_file(&mut self, output_path: &Path,content:&str) -> Result<(), Error> {
-        if let Err(e) = fs::write(output_path, content) {
-           return  Err(Error::PathCreateErr(format!("Could not create file:{}", e)))
         }
         Ok(())
     }

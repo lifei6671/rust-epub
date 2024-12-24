@@ -56,18 +56,18 @@ impl XHtmlRoot {
     pub fn encode_xml(&mut self) -> Result<String, super::Error> {
         let body = self.body.content.clone();
         self.body.content = String::from("{body}");
-        let ret = quick_xml::se::to_string(self);
+        let ret = super::encode_xml(self);
 
         match ret {
             Ok(s) => {
                 let xml_str = format!(
-                    "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><!DOCTYPE html>{}",
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<!DOCTYPE html>\n{}",
                     s.replace("{body}", &body)
                 );
                 self.body.content = body;
                 Ok(xml_str)
             }
-            Err(e) => Err(super::Error::NonEncodable(e.to_string())),
+            Err(e) => Err(e),
         }
     }
 }
