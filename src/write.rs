@@ -17,7 +17,8 @@ pub(crate) fn create_epub_folders(root_dir: &Path) -> Result<(), Error> {
 }
 
 /// Create media folder
-pub(crate) fn create_media_folder(root_dir: &Path,media_folder_name:&str,hashmap :&mut DashMap<String,String>) -> Result<(), Error> {
+pub(crate) fn create_media_folder(root_dir: &Path,media_folder_name:&str,hashmap :&mut DashMap<String,String>)
+    -> Result<(), Error> {
     if !hashmap.is_empty() {
         let media_folder_path = root_dir.join(epub::CONTENT_FOLDER_NAME).join(media_folder_name);
         if let Err(e) = fs::create_dir_all(&media_folder_path) {
@@ -34,3 +35,22 @@ pub(crate) fn write_file(output_path: &Path,content:&str) -> Result<(), Error> {
     }
     Ok(())
 }
+
+/// copy media file
+pub(crate) fn write_media_file (root_dir: &Path,media_folder_name:&str,hashmap :&DashMap<String,String>)
+    -> Result<(), Error> {
+    if !hashmap.is_empty() {
+        for item in hashmap.iter() {
+            let media_folder_path = root_dir.
+                join(epub::CONTENT_FOLDER_NAME).
+                join(media_folder_name).
+                join(item.key());
+            let source_path = Path::new(item.value());
+            if let Err(e) = fs::copy(source_path,media_folder_path) {
+                return  Err(Error::PathCreateErr(format!("Could not copy file:{}", e)))
+            }
+        }
+    }
+    Ok(())
+
+ }

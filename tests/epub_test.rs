@@ -120,7 +120,7 @@ fn test_set_cover() {
 
 #[test]
 fn test_encode_toc_xml() {
-    let mut epub = EpubBuilder::new("大语言模型：辩论", EpubVersion::V20);
+    let mut epub = EpubBuilder::new("大语言模型：辩论", EpubVersion::V30);
     // let temp_dir: PathBuf = env::temp_dir();
     let mut rng = thread_rng();
     let random_dir_name: String = (0..8)

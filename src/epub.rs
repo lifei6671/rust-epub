@@ -335,11 +335,8 @@ impl EpubBuilder {
     }
 
     /// Set the epub cover
-    pub fn set_cover<S1: Into<String>>(
-        &mut self,
-        internal_image_path: S1,
-        internal_css_path: Option<String>,
-    ) -> Result<String, Error> {
+    pub fn set_cover<S1: Into<String>>(&mut self, internal_image_path: S1, internal_css_path: Option<String>)
+        -> Result<String, Error> {
         let raw_image_path = internal_image_path.into();
         let image_path = Path::new(&raw_image_path);
 
@@ -380,6 +377,7 @@ impl EpubBuilder {
             .and_then(|name| name.to_str())
             .unwrap_or_default()
             .to_string();
+        cover.xhtml_filename = cover_xhtml_filename.clone();
 
         Ok(cover_xhtml_filename)
     }
@@ -407,8 +405,8 @@ impl EpubBuilder {
         body: S1,
         section_title: S2,
         internal_filename: Option<String>,
-        internal_css_path: Option<String>,
-    ) -> Result<String, Error> {
+        internal_css_path: Option<String>, )
+        -> Result<String, Error> {
         let mut base_filename = String::new();
         if let Some(mut filename) = internal_filename {
             let ext = Path::new(&filename)
@@ -541,10 +539,14 @@ impl EpubBuilder {
         if let Err(e) =  self.write_all_sections(xhtml_path.as_ref()) {
             return Err(e);
         }
+        write::write_media_file(output_path,CSS_FOLDER_NAME,&self.stylesheet)?;
+        write::write_media_file(output_path,FONT_FOLDER_NAME,&self.fonts)?;
+        write::write_media_file(output_path,IMAGE_FOLDER_NAME,&self.images)?;
+        write::write_media_file(output_path,VIDEO_FOLDER_NAME,&self.videos)?;
+        write::write_media_file(output_path,AUDIO_FOLDER_NAME,&self.audios)?;
 
          Ok(())
     }
-
 
     fn write_all_sections(&mut self, output_path: &Path) -> Result<(), Error> {
         let mut sections = std::mem::take(&mut self.sections); // 临时取出 sections
@@ -569,6 +571,10 @@ impl EpubBuilder {
         Ok(())
     }
     fn encode_toc_xml(&mut self,toc_path:&Path) -> Result<(), Error> {
+        let cover_filename :String;
+        if let Some(cover) = &self.cover {
+            cover_filename = cover.lock().unwrap().xhtml_filename.clone();
+        }
         let lang = self.language.as_deref().unwrap_or("zh-CN");
 
         let mut toc = TocNav::new(self.title.clone(), lang);
@@ -576,13 +582,14 @@ impl EpubBuilder {
         toc.add_metadata("dtb:totalPageCount", "0");
         toc.add_metadata("dtb:maxPageNumber", "0");
 
+
         let mut depth = 0;
         self.sections
             .iter().
             enumerate()
             // .map(|item| Self::convert_section(item, index, 0, &mut depth))
             .for_each(|(index,item)| {
-                let element = Self::convert_section(item, index as i32, 0, &mut depth);
+                let element = Self::convert_section(item, (index + 1) as i32, 0, &mut depth);
                 toc.add_element(element);
             });
 
@@ -609,6 +616,7 @@ impl EpubBuilder {
         if depth > *max_depth {
             *max_depth = depth;
         }
+
         TocElement {
             level: index,
             url: format!("{}/{}", XHTML_FOLDER_NAME, section.filename.clone()),

@@ -53,15 +53,11 @@ impl TocNav {
         for el in self.elements.iter_mut() {
             ncx.nav_map.nav_point.push(NavPoint::from_toc_element(el));
         }
-        let ret = super::encode_xml(&ncx);
-        match ret {
-            Ok(s) => {
-                let xml_str = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n{}",
-                    s);
-                Ok(xml_str)
-            }
-            Err(e) => Err(e),
-        }
+        let ret = super::encode_xml(&ncx)?;
+        Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+        <!DOCTYPE PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"\n\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n{}",
+                    ret))
+
     }
 
     fn encode_nav_file(&mut self) -> Result<String, super::Error> {
@@ -73,17 +69,8 @@ impl TocNav {
         for el in self.elements.iter() {
             html.body.nav_toc.add_list(List::from_toc_element(el));
         }
-        let ret = super::encode_xml(&html);
-        match ret {
-            Ok(s) => {
-                let xml_str = format!(
-                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html>{}",
-                    s
-                );
-                Ok(xml_str)
-            }
-            Err(e) => Err(e),
-        }
+        let ret = super::encode_xml(&html)?;
+        Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html>\n{}", ret))
     }
 
     fn covert_meta_item<F>(&self, mut callback: F)
