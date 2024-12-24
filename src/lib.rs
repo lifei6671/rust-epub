@@ -90,23 +90,18 @@ fn add_media<S1: Into<String>, S2: Into<String>>(
             &source_str
         )));
     }
-    // 判断是否指定了内部文件名
-    let filename = if let Some(internal_filename) = internal_filename {
-        internal_filename
-    } else {
+    let filename = internal_filename.unwrap_or_else(|| {
         let file_path = Path::new(&source_str);
         let basename = file_path.file_name().unwrap().to_str().unwrap();
-        // 判断文件名是否过长或是否已被使用
+
         if basename.len() > 255 || hashmap.contains_key(basename) {
-            let ext = file_path
-                .extension()
-                .and_then(|osstr| osstr.to_str())
-                .unwrap_or("jpg");
+            let ext = file_path.extension().and_then(|osstr| osstr.to_str()).unwrap_or("jpg");
             format!("{}_{}.{}", media_file_format, hashmap.len() + 1, ext)
         } else {
-            String::from(basename)
+            basename.to_string()
         }
-    };
+    });
+
     if hashmap.contains_key(&filename) {
         return Err(Error::FilenameUsedErr(format!(
             "Filename already used:{}",
